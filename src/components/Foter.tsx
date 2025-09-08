@@ -113,7 +113,7 @@ const FooterSection: React.FC = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .delay-75 {
           animation-delay: 75ms;
         }
