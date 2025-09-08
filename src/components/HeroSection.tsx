@@ -15,10 +15,6 @@ const HeroSection: React.FC = () => {
 
   const navigate = useNavigate();
 
-  const handleNavigate = () => {
-    navigate('/agent'); // <-- La ruta a la que quieres navegar
-  };
-
   // La URL de tu audio
   const audioUrl = "https://res.cloudinary.com/dmyq0gr14/video/upload/v1756488962/KAROL_G_-_Viajando_Por_El_Mundo_Visualizer_ft._Manu_Chao_tzvqmg.mp3";
 
