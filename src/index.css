@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+:root {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Estrellas con efectos de profundidad y titileo */
+.stars-far {
+  animation: twinkle 3s ease-in-out infinite;
+  opacity: 0.5;
+  filter: blur(0.3px);
+}
+
+.stars-medium {
+  animation: twinkle 2.5s ease-in-out infinite;
+  opacity: 0.7;
+  filter: blur(0.1px);
+}
+
+.stars-near {
+  animation: twinkle 2s ease-in-out infinite;
+  opacity: 0.9;
+  filter: blur(0px);
+}
+
+.stars-bright {
+  animation: twinkle 1.5s ease-in-out infinite;
+  opacity: 1;
+  filter: blur(0px);
+}
+
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  20% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  80% {
+    opacity: 0.6;
+    transform: scale(1.02);
+  }
+}
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===> AGREGA ESTO AL FINAL DE TU ARCHIVO CSS <=== */
+@layer base {
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slide-up-fade {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
