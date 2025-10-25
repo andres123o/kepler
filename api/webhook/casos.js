@@ -1,6 +1,6 @@
 // Endpoint para Vercel Serverless Functions
-// IMPORTANTE: Vercel requiere el formato export default para ES modules
-export default async function handler(req, res) {
+// IMPORTANTE: Vercel detecta automáticamente el handler
+module.exports = async (req, res) => {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
