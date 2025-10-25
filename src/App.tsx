@@ -4,6 +4,9 @@ import { Routes, Route } from 'react-router-dom';
 import Agent from './pages/Agent'
 import Home from './pages/Home'
 import GlobalBackground from './components/GlobalBackground'
+import HomeDemo from './demo/homeDemo'
+import EncuestaNPS from './demo/encuestaNPS'
+import EncuestaScat from './demo/Scat'
 
 function App() {
   return (
@@ -18,6 +21,14 @@ function App() {
 
         {/* Cuando la URL sea "/agent", muestra el componente Agent */}
         <Route path="/agent" element={<Agent />} />
+
+        <Route path="/demo" element={<HomeDemo />} />
+        
+        {/* Ruta única para la encuesta NPS */}
+        <Route path="/encuesta/nps" element={<EncuestaNPS />} />
+        
+        {/* Ruta única para la encuesta SCAT */}
+        <Route path="/encuesta/scat" element={<EncuestaScat />} />
       </Routes>
     </div>
   )

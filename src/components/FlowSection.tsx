@@ -22,7 +22,7 @@ const FlowSection: React.FC = () => {
         {/* Título simple y directo */}
         <div className="text-center mb-12">
           <p className="text-sm md:text-base text-gray-500 dark:text-gray-200 uppercase tracking-widest font-medium">
-            DESARROLLADO POR MCP INTEGRACIONES CON
+            DESARROLLADO A TU MEDIDA CON
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 // El componente CardBackground se mantiene igual
 const CardBackground: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
@@ -30,17 +30,77 @@ const CardBackground: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
   );
 };
 
-const ManifestoSection: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [typedText, setTypedText] = useState('');
-  const fullText = "El tiempo es la única moneda que importa.";
-  
-  // Hooks useEffect para el efecto de typing
+// Componente de Tarjeta con la nueva lógica de animación por tiempo
+const ManifestoCard: React.FC<{ item: any }> = ({ item }) => {
+  const [isRevealed, setIsRevealed] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setIsVisible(true);
+          // Cuando la tarjeta es visible, activa un temporizador de 3 segundos
+          const timer = setTimeout(() => {
+            setIsRevealed(true);
+          }, 4000); // 3 segundos de retraso
+          
+          observer.unobserve(entry.target); // Dejar de observar para que no se repita
+
+          // Limpieza del temporizador si el componente se desmonta
+          return () => clearTimeout(timer);
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => {
+      if (cardRef.current) {
+        observer.unobserve(cardRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <div ref={cardRef}>
+      {/* CORREGIDO: Eliminados los efectos hover:shadow y hover:-translate-y */}
+      <div className="relative rounded-2xl p-8 border border-white/10 transition-all duration-500 overflow-hidden">
+        <CardBackground imageUrl={item.imageUrl} />
+        <div className="relative z-10">
+          <div className="text-4xl md:text-5xl font-light text-white/90 mb-2">
+            {item.number}
+          </div>
+          <div className="relative h-6 overflow-hidden">
+            {/* Texto normal */}
+            <p className={`absolute inset-0 text-white transition-transform duration-700 ease-out ${isRevealed ? '-translate-y-full' : 'translate-y-0'}`}>
+              {item.label}
+            </p>
+            {/* Texto que se revela con el temporizador */}
+            <p className={`absolute inset-0 text-white transition-transform duration-700 ease-out ${isRevealed ? 'translate-y-0' : 'translate-y-full'}`}>
+              {item.truth}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ManifestoSection: React.FC = () => {
+  const [isTitleVisible, setIsTitleVisible] = useState(false);
+  const [typedText, setTypedText] = useState('');
+  // TEXTOS REFINADOS: Título principal más emotivo
+  const fullText = "El tiempo es la única moneda que importa.";
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsTitleVisible(true);
+          observer.unobserve(entry.target);
         }
       },
       { threshold: 0.3 }
@@ -53,38 +113,38 @@ const ManifestoSection: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (isVisible && typedText.length < fullText.length) {
+    if (isTitleVisible && typedText.length < fullText.length) {
       const timeout = setTimeout(() => {
         setTypedText(fullText.slice(0, typedText.length + 1));
       }, 50);
       return () => clearTimeout(timeout);
     }
-  }, [isVisible, typedText]);
+  }, [isTitleVisible, typedText]);
 
+  // TEXTOS REFINADOS: Datos de las tarjetas más genuinos
   const cardData = [
     { 
-      number: "+2,400", 
-      label: "Emails enviados este año",
-      truth: "0 atardeceres contemplados",
+      number: "+5", 
+      label: "Tools en tu stack",
+      truth: "Ventanas abiertas",
       imageUrl: "https://res.cloudinary.com/dmyq0gr14/image/upload/v1756505290/ilustracion-de-hawai-en-estilo-comico-retro_1_bbrnqq.jpg"
     },
     { 
       number: "+500", 
-      label: "Horas en reuniones",
-      truth: "+500 horas sin crear",
+      label: "Horas en tareas manuales",
+      truth: "Donde mueren las grandes ideas.",
       imageUrl: "https://res.cloudinary.com/dmyq0gr14/image/upload/v1756495493/Dimensiones_personalizadas_ugncat.jpg"
     },
     { 
       number: "∞", 
-      label: "Tareas repetitivas",
-      truth: "Una sola vida para vivir",
+      label: "Procesos y tareas repetitivas",
+      truth: "Potencial de tu equipo evaporado",
       imageUrl: "https://res.cloudinary.com/dmyq0gr14/image/upload/v1756505436/escena-de-verano-del-estilo-de-vida-de-los-dibujos-animados_we0fan.jpg"
     }
   ];
 
   return (
     <div id="manifesto-wrapper" className="relative w-full min-h-screen">
-      {/* Título separado con altura fija */}
       <div className="relative w-full h-[200px] md:h-[240px] flex items-center justify-center px-6">
         <h2 className="text-2xl md:text-4xl lg:text-5xl font-thin text-white text-center">
           <span className="inline-block">
@@ -94,99 +154,55 @@ const ManifestoSection: React.FC = () => {
         </h2>
       </div>
 
-      {/* Sección principal con cards y contenido */}
       <section id="manifesto-section" className="relative w-full flex items-start justify-center px-6">
         <div className="relative z-10 w-[70%] mx-auto text-center">
-          
-          {/* Cards estáticas - sin animación de entrada */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-20">
             {cardData.map((item, index) => (
-              <div 
-                key={index}
-                className="group relative"
-              >
-                <div className="relative rounded-2xl p-8 border border-white/10 transition-all duration-500 hover:-translate-y-2 hover:shadow-xl hover:shadow-white/10 overflow-hidden">
-                  <CardBackground imageUrl={item.imageUrl} />
-                  <div className="relative z-10">
-                    <div className="text-4xl md:text-5xl font-light text-white/90 mb-2">
-                      {item.number}
-                    </div>
-                    <div className="relative h-6 overflow-hidden">
-                      {/* Texto normal en blanco */}
-                      <p className="absolute inset-0 text-white transition-all duration-500 group-hover:-translate-y-full">
-                        {item.label}
-                      </p>
-                      {/* Texto en hover en blanco */}
-                      <p className="absolute inset-0 text-white translate-y-full transition-all duration-500 group-hover:translate-y-0">
-                        {item.truth}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ManifestoCard key={index} item={item} />
             ))}
           </div>
 
-          {/* Sección de texto */}
-          <div className={`space-y-4 mb-20 ${isVisible ? 'animate-fade-in' : 'opacity-0'}`}>
+          {/* TEXTOS REFINADOS: El manifiesto */}
+          <div className={`space-y-4 mb-20 ${isTitleVisible ? 'animate-fade-in' : 'opacity-0'}`}>
             <p className="text-lg md:text-xl text-gray-400 font-light">
               Creamos esto porque
             </p>
             <p className="text-xl md:text-3xl text-white font-light">
-              crear no se trata de hacer más.
+              el verdadero trabajo no es gestionar el caos.
             </p>
             <p className="text-2xl md:text-4xl font-light">
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-pink-400 to-purple-400">
-                Se trata de vivir más.
+              Es crear las condiciones para que la magia ocurra.
               </span>
             </p>
           </div>
 
-          {/* CTA Button */}
-          <div className={`${isVisible ? 'animate-fade-in-delayed' : 'opacity-0'}`}>
+          {/* TEXTOS REFINADOS: El CTA Final */}
+          <div className={`${isTitleVisible ? 'animate-fade-in-delayed' : 'opacity-0'}`}>
             <p className="text-gray-600 text-sm mt-4">
-              Gratis para siempre para los creadores que valoran su tiempo.
+              Dale a tu equipo una sola herramienta, no mil tareas.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Estilos para las animaciones */}
+      {/* Los estilos para las animaciones de fade-in y blink se mantienen igual */}
       <style>{`
         @keyframes blink {
           0%, 50% { opacity: 1; }
           51%, 100% { opacity: 0; }
         }
-        
         @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        
         @keyframes fade-in-delayed {
-          from { 
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to { 
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        
-        .animate-blink {
-          animation: blink 1s ease-in-out infinite;
-        }
-        
-        .animate-fade-in {
-          animation: fade-in 1s ease-out forwards;
-          animation-delay: 0.5s;
-        }
-        
-        .animate-fade-in-delayed {
-          animation: fade-in-delayed 1s ease-out forwards;
-          animation-delay: 1s;
-        }
+        .animate-blink { animation: blink 1s ease-in-out infinite; }
+        .animate-fade-in { animation: fade-in 1s ease-out forwards; animation-delay: 0.5s; }
+        .animate-fade-in-delayed { animation: fade-in-delayed 1s ease-out forwards; animation-delay: 1s; }
       `}</style>
     </div>
   );

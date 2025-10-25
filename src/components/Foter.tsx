@@ -22,7 +22,7 @@ const FooterSection: React.FC = () => {
           </p>
           <p className="text-xl md:text-2xl font-light text-center">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-400">
-              Empieza a construir tu vida.
+              Empieza a ganar tiempo con la IA.
             </span>
           </p>
         </div>
@@ -108,7 +108,7 @@ const FooterSection: React.FC = () => {
         {/* Easter egg (sin cambios) */}
         <div className="mt-8 text-center">
           <p className="text-[10px] text-gray-600 hover:text-gray-400 transition-colors duration-1000 cursor-default select-none">
-            Has llegado hasta el final. Ahora ve y crea algo hermoso.
+            Has llegado hasta el final. Ahora ve y prueba nuestra demo.
           </p>
         </div>
       </div>

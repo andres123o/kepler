@@ -40,3 +40,19 @@
 .read-the-docs {
   color: #888;
 }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.animate-gradient-text {
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(
+    to right,
+    #f1644b, /* Naranja */
+    #d3267f, /* Rosa */
+    #b84378, /* Magenta */
+    #d3267f, /* Rosa */
+    #f1644b  /* Naranja */
+  );
+}

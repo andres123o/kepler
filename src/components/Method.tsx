@@ -38,25 +38,25 @@ const CardBackground: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
 
 const MethodSection: React.FC = () => {
   const steps = [
-    {
-      number: '01',
-      title: 'Imagina',
-      description: 'Comparte tu idea, por muy abstracta que sea. La IA te ayuda a darle forma y estructurarla.',
-      imageUrl: 'https://res.cloudinary.com/dmyq0gr14/image/upload/v1756505290/ilustracion-de-hawai-en-estilo-comico-retro_1_bbrnqq.jpg'
-    },
-    {
-      number: '02', 
-      title: 'Colaborar',
-      description: 'Trabaja con la IA para perfeccionar tu visión. Investiga, sugiere mejoras y te guía en cada decisión.',
-      imageUrl: 'https://res.cloudinary.com/dmyq0gr14/image/upload/v1756495493/Dimensiones_personalizadas_ugncat.jpg'
-    },
-    {
-      number: '03',
-      title: 'Lanzamiento', 
-      description: 'Desde la idea hasta la ejecución, te guiamos por todo el proceso hasta el lanzamiento.',
-      imageUrl: 'https://res.cloudinary.com/dmyq0gr14/image/upload/v1756505436/escena-de-verano-del-estilo-de-vida-de-los-dibujos-animados_we0fan.jpg'
-    }
-  ];
+      {
+        number: '01',
+        title: 'Unifica',
+        description: 'Toda la comunicación de tus clientes en un solo panel. Adiós al caos de cambiar de pestañas, hola a la claridad.',
+        imageUrl: 'https://res.cloudinary.com/dmyq0gr14/image/upload/v1756505290/ilustracion-de-hawai-en-estilo-comico-retro_1_bbrnqq.jpg'
+      },
+      {
+        number: '02', 
+        title: 'Comprende',
+        description: 'Describe la encuesta que necesitas con tus palabras y nuestra IA la crea al instante. Con tu branding',
+        imageUrl: 'https://res.cloudinary.com/dmyq0gr14/image/upload/v1756495493/Dimensiones_personalizadas_ugncat.jpg'
+      },
+      {
+        number: '03',
+        title: 'Optimiza', 
+        description: 'Analiza las respuestas y el rendimiento de tu equipo con métricas claras. Toma buenas decisiones.',
+        imageUrl: 'https://res.cloudinary.com/dmyq0gr14/image/upload/v1756505436/escena-de-verano-del-estilo-de-vida-de-los-dibujos-animados_we0fan.jpg'
+      }
+    ];
 
   return (
     <section className="relative w-full py-20 px-6">
@@ -66,7 +66,7 @@ const MethodSection: React.FC = () => {
             El método
           </h2>
           <p className="text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Tres sencillos pasos entre tu idea y su ejecución automática
+          El proceso para convertir cada interacción con el cliente en una oportunidad de crecimiento.
           </p>
         </div>
 
