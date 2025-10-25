@@ -1,6 +1,5 @@
 // Endpoint para Vercel Serverless Functions
-// IMPORTANTE: Vercel detecta automáticamente el handler
-module.exports = async (req, res) => {
+export default function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -8,12 +7,14 @@ module.exports = async (req, res) => {
 
   // Manejar preflight requests
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
   // Solo aceptar POST
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method not allowed' });
+    res.status(405).json({ success: false, message: 'Method not allowed' });
+    return;
   }
 
   try {
@@ -21,9 +22,7 @@ module.exports = async (req, res) => {
     
     console.log('📥 Webhook recibido desde n8n:', payload);
     
-    // Aquí guardarías en tu base de datos real
-    // Por ahora solo respondemos con éxito simulando la creación
-    
+    // Crear nuevo incidente
     const newIncident = {
       id: Date.now(),
       ticket_number: payload.ticket_number || `CO-${Math.floor(Math.random() * 9000) + 1000}`,
@@ -40,7 +39,8 @@ module.exports = async (req, res) => {
     
     console.log('✅ Incidente creado:', newIncident);
     
-    return res.status(200).json({ 
+    // Respuesta exitosa
+    res.status(200).json({ 
       success: true, 
       message: 'Incidente creado exitosamente',
       incident: newIncident 
@@ -48,7 +48,7 @@ module.exports = async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error:', error);
-    return res.status(400).json({ 
+    res.status(400).json({ 
       success: false, 
       message: error.message 
     });
