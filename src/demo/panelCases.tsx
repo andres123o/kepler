@@ -1,10 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlobalBackground from '../components/GlobalBackground';
-import { MdOutlineWhatsapp } from 'react-icons/md';
-import { FaInstagram } from 'react-icons/fa';
-import { BiLogoGmail } from 'react-icons/bi';
-import { BsBrowserChrome } from 'react-icons/bs';
 
 // --- ICONOS (SVG en línea para eliminar dependencias) ---
 const Eye = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>;
@@ -286,7 +282,6 @@ const AGENT_OPTIONS = ['Todos los agentes', 'Alejandra', 'Jesús', 'Laura', 'Car
 const COUNTRY_OPTIONS = ['COL', 'PE', 'CHL'];
 const PRIORITY_OPTIONS = ['Alto', 'Medio', 'Bajo'];
 const TECH_REP_OPTIONS = ['Camila', 'Andres', 'Jorge', 'Camilo'];
-const INCIDENT_TYPE_OPTIONS = ['Falla in-app', 'Pagos', 'Interfaz'];
 
 // --- COMPONENTES DE UI RE-ESTILIZADOS ---
 const StatCard = memo<{ title: string, value: string | number, icon: React.ReactNode, backgroundImage?: string }>(({ title, value, icon, backgroundImage }) => (

@@ -62,15 +62,6 @@ const CaseTracking: React.FC = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'En progreso': return '🔄';
-      case 'Gestionado': return '✅';
-      case 'Pendiente': return '⏳';
-      default: return '📋';
-    }
-  };
-
   const getEstimatedTime = (status: string) => {
     switch (status) {
       case 'En progreso': return '5-10 min';

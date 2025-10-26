@@ -149,12 +149,12 @@ const HomeDemo: React.FC = () => {
                             transition={{ duration: 0.8, delay: 0.5, ease: 'easeInOut' }}
                             className="flex-grow pt-8 pr-8 pb-8 h-screen overflow-hidden"
                         >
-                            <header className="flex items-center justify-between">
+                            <header className="flex items-center justify-between pl-8">
                                 {/* Módulo de música */}
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 relative z-50">
                                     <button
                                         onClick={togglePlayPause}
-                                        className={`relative flex h-10 w-10 items-center justify-center rounded-full text-white border-2 border-white/20 bg-white/10 backdrop-blur-sm transition-all duration-300 hover:bg-white/20 hover:scale-110 focus:outline-none`}
+                                        className={`relative z-50 flex h-10 w-10 items-center justify-center rounded-full text-white border-2 border-white/20 bg-white/10 backdrop-blur-sm transition-all duration-300 hover:bg-white/20 hover:scale-110 focus:outline-none`}
                                     >
                                         {!isPlaying && (
                                             <div className="absolute inset-0 rounded-full bg-white/20 animate-ping pointer-events-none" />
@@ -165,7 +165,7 @@ const HomeDemo: React.FC = () => {
                                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 5.5v11a1.5 1.5 0 002.482 1.12l8-5.5a1.5 1.5 0 000-2.24l-8-5.5A1.5 1.5 0 007 5.5z" /></svg>
                                         )}
                                     </button>
-                                    <div className={`transition-all duration-500 ease-in-out ${isPlaying ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0'} overflow-hidden`}>
+                                    <div className={`relative z-50 transition-all duration-500 ease-in-out ${isPlaying ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0'} overflow-hidden`}>
                                         <div className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-4 py-2">
                                             <p className="text-white/80 text-xs font-semibold whitespace-nowrap">KAROL G, Manu Chao - Viajando Por El Mundo</p>
                                         </div>

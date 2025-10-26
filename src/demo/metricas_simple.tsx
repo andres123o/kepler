@@ -50,7 +50,7 @@ const MetricasPanel: React.FC = () => {
                     </div>
 
                     {/* Tiempo Promedio - Card */}
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
                         <p className="text-xs text-white/60 mb-3 uppercase tracking-wide">⏱️ Tiempo Promedio</p>
                         <div className="space-y-3">
                             <div>
@@ -70,7 +70,7 @@ const MetricasPanel: React.FC = () => {
                 <div className="w-full max-w-5xl grid grid-cols-2 gap-6 mt-6">
                     
                     {/* Canales Más Usados */}
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center">
                         <p className="text-xs text-white/60 mb-4 uppercase tracking-widest">📱 Canales</p>
                         <div className="grid grid-cols-4 gap-3">
                             <div className="text-center">
