@@ -1,0 +1,13 @@
+window.handleVoiceAgentWebhook({
+  "ticket_number": "CO-01420",
+  "cx_agent": "Alejandra",
+  "priority": "Alto",
+  "customer_name": "Andrés Cristancho",
+  "customer_email": "andres@gmail.com",
+  "country": "COL",
+  "report_description": "El usuario no logra ver el botón de transferir sus ahorros a su cuenta de banco.",
+  "status": "En progreso",
+  "channel": "WhatsApp",
+  "incident_type": "Falla in-app"
+});
+

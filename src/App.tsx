@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 
 import Agent from './pages/Agent'
 import Home from './pages/Home'
+import CaseTracking from './pages/CaseTracking'
 import GlobalBackground from './components/GlobalBackground'
 import HomeDemo from './demo/homeDemo'
 import EncuestaNPS from './demo/encuestaNPS'
@@ -23,6 +24,9 @@ function App() {
         <Route path="/agent" element={<Agent />} />
 
         <Route path="/demo" element={<HomeDemo />} />
+        
+        {/* Ruta para tracking de caso */}
+        <Route path="/caso/:ticketNumber" element={<CaseTracking />} />
         
         {/* Ruta única para la encuesta NPS */}
         <Route path="/encuesta/nps" element={<EncuestaNPS />} />

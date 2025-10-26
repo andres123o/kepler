@@ -1,0 +1,35 @@
+🎭 TRUCO DEL MAGO DE OZ - LISTO
+
+✅ LO QUE HICE:
+- Hice el avatar de usuario (letra "A" con fondo naranja/rosa) clicable
+- Cuando hagas click en el avatar, automáticamente se inyectarán estos datos:
+
+{
+  "ticket_number": "CO-01420",
+  "cx_agent": "Alejandra",
+  "priority": "Alto",
+  "customer_name": "Andrés Cristancho",
+  "customer_email": "andres@gmail.com",
+  "country": "COL",
+  "report_description": "El usuario no logra ver el botón de transferir sus ahorros a su cuenta de banco.",
+  "status": "En progreso",
+  "channel": "WhatsApp",
+  "incident_type": "Falla in-app"
+}
+
+🎯 CÓMO FUNCIONA:
+- El avatar se ve normal (no parece un botón)
+- Solo tiene un hover sutil (escala 105%)
+- Cuando clickeas → Los datos aparecen en la tabla inmediatamente
+
+🎪 DURANTE EL DEMO:
+1. "El agente de voz está procesando datos..."
+2. (Click discreto en el avatar)
+3. "¡Miren! El incidente llegó en tiempo real"
+
+✅ CAMBIOS REALIZADOS:
+- Archivo: src/demo/homeDemo.tsx
+- Función: handleAvatarClick
+- Lo que hace: Llama a window.handleVoiceAgentWebhook con los datos
+- Resultado: El incidente aparece en la tabla automáticamente
+

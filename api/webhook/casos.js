@@ -34,6 +34,7 @@ export default function handler(req, res) {
       report_description: payload.report_description || 'Descripción',
       status: payload.status || 'En progreso',
       channel: payload.channel || 'WhatsApp',
+      incident_type: payload.incident_type || 'Falla in-app',
       createdAt: new Date().toISOString()
     };
     

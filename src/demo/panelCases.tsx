@@ -41,7 +41,8 @@ const NewIncidentModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave:
         cx_agent: 'Alejandra',
         tech_rep: 'Camila',
         report_description: '',
-        channel: 'Email' as Channel
+        channel: 'Email' as Channel,
+        incident_type: 'Falla in-app' as IncidentType
     });
 
     const generateTicketNumber = () => {
@@ -62,6 +63,7 @@ const NewIncidentModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave:
             report_description: formData.report_description,
             status: 'En progreso' as Status,
             channel: formData.channel,
+            incident_type: formData.incident_type,
             createdAt: new Date()
         };
         
@@ -82,7 +84,8 @@ const NewIncidentModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave:
             cx_agent: 'Alejandra',
             tech_rep: 'Camila',
             report_description: '',
-            channel: 'Email' as Channel
+            channel: 'Email' as Channel,
+            incident_type: 'Falla in-app' as IncidentType
         });
         onClose();
     };
@@ -248,6 +251,7 @@ type Status = 'En progreso' | 'Gestionado' | 'Pendiente';
 type Priority = 'Alto' | 'Medio' | 'Bajo';
 type Country = 'COL' | 'PE' | 'CHL';
 type Channel = 'WhatsApp' | 'Instagram' | 'Email' | 'Web' | 'In-App';
+type IncidentType = 'Falla in-app' | 'Pagos' | 'Interfaz';
 
 interface Incident {
     id: number;
@@ -260,6 +264,7 @@ interface Incident {
     report_description: string;
     status: Status;
     channel: Channel;
+    incident_type: IncidentType;
     createdAt: Date | string | undefined;
 }
 
@@ -268,19 +273,20 @@ const getRandomMinutes = (max: number = 30) => Math.floor(Math.random() * max) +
 
 const mockIncidents: Incident[] = [
     // TICKETS EN PROGRESO (2) - ANS aleatorio máximo 30 minutos
-    { id: 1, ticket_number: 'CO-01419', cx_agent: 'Alejandra', priority: 'Medio', customer_name: 'Brian Ordoñez', customer_email: 'brian.s.ordonez@gmail.com', country: 'COL', report_description: 'No le permite invertir en el fondo dinámico', status: 'En progreso', channel: 'WhatsApp', createdAt: new Date(Date.now() - getRandomMinutes(30) * 60 * 1000) },
-    { id: 2, ticket_number: 'PE-00215', cx_agent: 'Laura', priority: 'Bajo', customer_name: 'Sofia Rodriguez', customer_email: 'sofia.r@email.com', country: 'PE', report_description: 'Consulta sobre comisiones de retiro', status: 'En progreso', channel: 'Email', createdAt: new Date(Date.now() - getRandomMinutes(30) * 60 * 1000) },
+    { id: 1, ticket_number: 'CO-01419', cx_agent: 'Alejandra', priority: 'Medio', customer_name: 'Brian Ordoñez', customer_email: 'brian.s.ordonez@gmail.com', country: 'COL', report_description: 'No le permite invertir en el fondo dinámico', status: 'En progreso', channel: 'WhatsApp', incident_type: 'Falla in-app', createdAt: new Date(Date.now() - getRandomMinutes(30) * 60 * 1000) },
+    { id: 2, ticket_number: 'PE-00215', cx_agent: 'Laura', priority: 'Bajo', customer_name: 'Sofia Rodriguez', customer_email: 'sofia.r@email.com', country: 'PE', report_description: 'Consulta sobre comisiones de retiro', status: 'En progreso', channel: 'Email', incident_type: 'Pagos', createdAt: new Date(Date.now() - getRandomMinutes(30) * 60 * 1000) },
     
     // TICKETS GESTIONADOS/FINALIZADOS (3) - ANS aleatorio máximo 30 minutos
-    { id: 3, ticket_number: 'CO-01418', cx_agent: 'Jesús', priority: 'Alto', customer_name: 'Wilson Vasquez', customer_email: 'wilsonap15@gmail.com', country: 'COL', report_description: 'Usuario no pasa validación, tiene slack', status: 'Gestionado', channel: 'Instagram', createdAt: new Date(Date.now() - getRandomMinutes(30) * 60 * 1000) },
-    { id: 4, ticket_number: 'CH-00876', cx_agent: 'Carlos', priority: 'Medio', customer_name: 'Mateo González', customer_email: 'mateo.g@email.com', country: 'CHL', report_description: 'La app se cierra al intentar abrir el mercado global', status: 'Gestionado', channel: 'Web', createdAt: new Date(Date.now() - getRandomMinutes(30) * 60 * 1000) },
-    { id: 5, ticket_number: 'CO-01417', cx_agent: 'Jesús', priority: 'Alto', customer_name: 'Esteban Pérez', customer_email: 'esteban.david.perez0312@gmail.com', country: 'COL', report_description: 'Validación de foto, tiene slack', status: 'Gestionado', channel: 'In-App', createdAt: new Date(Date.now() - getRandomMinutes(30) * 60 * 1000) },
+    { id: 3, ticket_number: 'CO-01418', cx_agent: 'Jesús', priority: 'Alto', customer_name: 'Wilson Vasquez', customer_email: 'wilsonap15@gmail.com', country: 'COL', report_description: 'Usuario no pasa validación, tiene slack', status: 'Gestionado', channel: 'Instagram', incident_type: 'Interfaz', createdAt: new Date(Date.now() - getRandomMinutes(30) * 60 * 1000) },
+    { id: 4, ticket_number: 'CH-00876', cx_agent: 'Carlos', priority: 'Medio', customer_name: 'Mateo González', customer_email: 'mateo.g@email.com', country: 'CHL', report_description: 'La app se cierra al intentar abrir el mercado global', status: 'Gestionado', channel: 'Web', incident_type: 'Falla in-app', createdAt: new Date(Date.now() - getRandomMinutes(30) * 60 * 1000) },
+    { id: 5, ticket_number: 'CO-01417', cx_agent: 'Jesús', priority: 'Alto', customer_name: 'Esteban Pérez', customer_email: 'esteban.david.perez0312@gmail.com', country: 'COL', report_description: 'Validación de foto, tiene slack', status: 'Gestionado', channel: 'In-App', incident_type: 'Interfaz', createdAt: new Date(Date.now() - getRandomMinutes(30) * 60 * 1000) },
 ];
 
 const AGENT_OPTIONS = ['Todos los agentes', 'Alejandra', 'Jesús', 'Laura', 'Carlos'];
 const COUNTRY_OPTIONS = ['COL', 'PE', 'CHL'];
 const PRIORITY_OPTIONS = ['Alto', 'Medio', 'Bajo'];
 const TECH_REP_OPTIONS = ['Camila', 'Andres', 'Jorge', 'Camilo'];
+const INCIDENT_TYPE_OPTIONS = ['Falla in-app', 'Pagos', 'Interfaz'];
 
 // --- COMPONENTES DE UI RE-ESTILIZADOS ---
 const StatCard = memo<{ title: string, value: string | number, icon: React.ReactNode, backgroundImage?: string }>(({ title, value, icon, backgroundImage }) => (
@@ -379,28 +385,17 @@ const getTimeElapsed = (createdAt: Date | string | undefined): string => {
 
 // Componente para mostrar el ícono del canal con nombre
 const ChannelIcon = memo<{ channel?: Channel }>(({ channel }) => {
-    switch (channel) {
-        case 'WhatsApp':
-            return <div className="flex items-center gap-2 text-sm"><MdOutlineWhatsapp size={16} className="text-white/80" /><span>WhatsApp</span></div>;
-        case 'Instagram':
-            return <div className="flex items-center gap-2 text-sm"><FaInstagram size={16} className="text-white/80" /><span>Instagram</span></div>;
-        case 'Email':
-            return <div className="flex items-center gap-2 text-sm"><BiLogoGmail size={16} className="text-white/80" /><span>Email</span></div>;
-        case 'Web':
-            return <div className="flex items-center gap-2 text-sm"><BsBrowserChrome size={16} className="text-white/80" /><span>Web</span></div>;
-        case 'In-App':
-            return <div className="flex items-center gap-2 text-sm"><span className="text-white/80">📱</span><span>In-App</span></div>;
-        default:
-            return <div className="flex items-center gap-2 text-sm"><BiLogoGmail size={16} className="text-white/80" /><span>Email</span></div>;
-    }
+    return <span className="text-sm text-white/80">{channel || 'N/A'}</span>;
 });
 
 // --- COMPONENTE DEL MODAL ---
-const IncidentModal: React.FC<{ incident: Incident | null, isOpen: boolean, onClose: () => void }> = ({ incident, isOpen, onClose }) => {
+const IncidentModal: React.FC<{ incident: Incident | null, isOpen: boolean, onClose: () => void, onStatusChange?: (incidentId: number, newStatus: Status) => void }> = ({ incident, isOpen, onClose, onStatusChange }) => {
     const [comments, setComments] = useState<Array<{ name: string, comment: string }>>([]);
     const [newComment, setNewComment] = useState({ name: '', comment: '' });
     const [message, setMessage] = useState({ subject: '', content: '' });
     const [showNotification, setShowNotification] = useState(false);
+    const [selectedStatus, setSelectedStatus] = useState<Status>(incident?.status || 'En progreso');
+    const [showSaveButton, setShowSaveButton] = useState(false);
 
     // Cargar comentarios desde localStorage al abrir el modal
     useEffect(() => {
@@ -409,6 +404,8 @@ const IncidentModal: React.FC<{ incident: Incident | null, isOpen: boolean, onCl
             if (savedComments) {
                 setComments(JSON.parse(savedComments));
             }
+            setSelectedStatus(incident.status);
+            setShowSaveButton(false);
         }
     }, [incident]);
 
@@ -428,7 +425,7 @@ const IncidentModal: React.FC<{ incident: Incident | null, isOpen: boolean, onCl
     const sendResponse = () => {
         if (message.subject && message.content) {
             // Llamada al webhook
-            fetch('https://primary-production-a44da.up.railway.app/webhook/ad20ffc5-7e82-45f0-ba38-bb3d6c62c8b7', {
+            fetch('https://primary-production-a44da.up.railway.app/webhook/6b936286-a74d-4bb7-8e89-97c4f49e28da', {
                 method: 'GET'
             }).catch(() => {
                 // No hacer nada si falla, es solo para simular
@@ -524,12 +521,54 @@ const IncidentModal: React.FC<{ incident: Incident | null, isOpen: boolean, onCl
                         <div>
                             <label className="text-sm text-white/60">Estado</label>
                             <AnimatedSelect 
-                                value={incident.status} 
-                                onValueChange={(value: any) => console.log(value)}
+                                value={selectedStatus} 
+                                onValueChange={(value: any) => {
+                                    setSelectedStatus(value);
+                                    setShowSaveButton(value !== incident.status);
+                                }}
                                 options={['Pendiente', 'En progreso', 'Gestionado']}
                                 placeholder="Seleccionar estado"
                                 className="w-full"
                             />
+                            {showSaveButton && (
+                                <Button 
+                                    onClick={async () => {
+                                        if (incident && onStatusChange) {
+                                            // Preparar los datos del cambio de estado
+                                            const statusChangeData = {
+                                                incident_id: incident.id,
+                                                ticket_number: incident.ticket_number,
+                                                old_status: incident.status,
+                                                new_status: selectedStatus,
+                                                updated_at: new Date().toISOString()
+                                            };
+                                            
+                                            console.log('📤 Enviando cambio de estado al webhook:', statusChangeData);
+                                            
+                                            // Enviar el cambio de estado al webhook
+                                            try {
+                                                const response = await fetch('https://primary-production-a44da.up.railway.app/webhook/71242354-cfda-4be0-842f-2d6a50cc2c17', {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json'
+                                                    },
+                                                    body: JSON.stringify(statusChangeData)
+                                                });
+                                                
+                                                console.log('✅ Respuesta del webhook:', await response.text());
+                                            } catch (error) {
+                                                console.error('❌ Error al enviar cambio de estado:', error);
+                                            }
+                                            
+                                            onStatusChange(incident.id, selectedStatus);
+                                            setShowSaveButton(false);
+                                        }
+                                    }}
+                                    className="mt-2 bg-gradient-to-r from-orange-500 to-pink-500 font-semibold px-4 py-2 rounded-md text-sm w-full"
+                                >
+                                    Guardar Cambio
+                                </Button>
+                            )}
                         </div>
                         <div>
                             <label className="text-sm text-white/60">Tiempo transcurrido</label>
@@ -539,7 +578,6 @@ const IncidentModal: React.FC<{ incident: Incident | null, isOpen: boolean, onCl
                             <label className="text-sm text-white/60">Canal</label>
                             <div className="flex items-center gap-2 mt-2">
                                 <ChannelIcon channel={incident.channel} />
-                                <span className="text-white">{incident.channel}</span>
                             </div>
                         </div>
                     </div>
@@ -860,19 +898,20 @@ const CasesPanel: React.FC = () => {
                                 <tr>
                                     <th className="p-3 text-left font-semibold text-white/60 w-24">No. Ticket</th>
                                     <th className="p-3 text-left font-semibold text-white/60 w-20">Prioridad</th>
+                                    <th className="p-3 text-left font-semibold text-white/60 w-24">Tipo</th>
                                     <th className="p-3 text-left font-semibold text-white/60 w-20">Agente CX</th>
-                                    <th className="p-3 text-left font-semibold text-white/60 w-48">Cliente</th>
+                                    <th className="p-3 text-left font-semibold text-white/60 w-36">Cliente</th>
                                     <th className="p-3 text-left font-semibold text-white/60 w-16">País</th>
                                     <th className="p-3 text-left font-semibold text-white/60 w-20">ANS</th>
                                     <th className="p-3 text-left font-semibold text-white/60 w-20">Canal</th>
-                                    <th className="p-3 text-left font-semibold text-white/60 w-20">Estado</th>
+                                    <th className="p-3 text-left font-semibold text-white/60 w-28">Estado</th>
                                     <th className="p-3 text-left font-semibold text-white/60 w-20">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredIncidents.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} className="p-8 text-center text-white/60">
+                                        <td colSpan={10} className="p-8 text-center text-white/60">
                                             No se encontraron incidentes con los filtros aplicados
                                         </td>
                                     </tr>
@@ -881,6 +920,7 @@ const CasesPanel: React.FC = () => {
                                         <tr key={incident.id} className="border-b border-white/10 hover:bg-white/5 cursor-pointer transition-colors duration-150">
                                             <td className="p-3 font-mono text-xs">{incident.ticket_number}</td>
                                             <td className="p-3"><PriorityBadge priority={incident.priority}/></td>
+                                            <td className="p-3 text-white/80 font-medium">{incident.incident_type}</td>
                                             <td className="p-3">{incident.cx_agent}</td>
                                             <td className="p-3">
                                                 <div className="font-medium">{incident.customer_name}</div>
@@ -918,7 +958,23 @@ const CasesPanel: React.FC = () => {
             <IncidentModal 
                 incident={selectedIncident} 
                 isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
+                onClose={() => setIsModalOpen(false)}
+                onStatusChange={(incidentId, newStatus) => {
+                    // Actualizar el estado en el array de incidents
+                    const updatedIncidents = incidents.map(inc => 
+                        inc.id === incidentId ? { ...inc, status: newStatus } : inc
+                    );
+                    setIncidents(updatedIncidents);
+                    
+                    // Actualizar en localStorage
+                    localStorage.setItem('incidents', JSON.stringify(updatedIncidents));
+                    
+                    // Actualizar selectedIncident para reflejar el cambio en el modal
+                    const updated = updatedIncidents.find(inc => inc.id === incidentId);
+                    if (updated) {
+                        setSelectedIncident(updated);
+                    }
+                }}
             />
 
             {/* Modal de nuevo incidente */}
@@ -953,6 +1009,7 @@ export default CasesPanel;
             report_description: payload.report_description,
             status: payload.status || 'En progreso',
             channel: payload.channel || 'WhatsApp',
+            incident_type: payload.incident_type || 'Falla in-app',
             createdAt: new Date()
         };
         

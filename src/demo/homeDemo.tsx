@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CasesPanel from './panelCases';
 // import FormulariosPanel from './formularios'; // Deshabilitado temporalmente
-import MetricasPanel from './metricas';
+import MetricasPanel from './metricas_simple';
 
 // --- ICONOS ---
 // Estos componentes SVG son para los iconos de la interfaz.
@@ -46,6 +46,25 @@ const HomeDemo: React.FC = () => {
 
     const userData = JSON.parse(localStorage.getItem('userData') || 'null');
     const userInitial = userData?.name.charAt(0).toUpperCase() || 'A';
+
+    const handleAvatarClick = () => {
+        const incident = {
+            ticket_number: "CO-01420",
+            cx_agent: "Alejandra",
+            priority: "Alto",
+            customer_name: "Andrés Cristancho",
+            customer_email: "andres@gmail.com",
+            country: "COL",
+            report_description: "El usuario no logra ver el botón de transferir sus ahorros a su cuenta de banco.",
+            status: "En progreso",
+            channel: "WhatsApp",
+            incident_type: "Falla in-app"
+        };
+        
+        if ((window as any).handleVoiceAgentWebhook) {
+            (window as any).handleVoiceAgentWebhook(incident);
+        }
+    };
 
     return (
         <div className="h-screen w-full text-white flex overflow-hidden">
@@ -157,9 +176,12 @@ const HomeDemo: React.FC = () => {
                                     <button className="text-white/60 hover:text-white transition-colors">
                                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                                     </button>
-                                    <div className="w-9 h-9 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full flex items-center justify-center font-bold text-sm border-2 border-slate-950">
+                                    <button 
+                                        onClick={handleAvatarClick}
+                                        className="w-9 h-9 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full flex items-center justify-center font-bold text-sm border-2 border-slate-950"
+                                    >
                                         {userInitial}
-                                    </div>
+                                    </button>
                                 </div>
                             </header>
 

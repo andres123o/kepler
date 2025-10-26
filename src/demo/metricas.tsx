@@ -30,7 +30,6 @@ ChartJS.register(
 );
 
 const MetricasPanel: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'casos' | 'nps' | 'csat'>('casos');
     
     // Obtener métricas de casos desde localStorage
     const getCasesMetrics = () => {
