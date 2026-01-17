@@ -87,13 +87,8 @@ export default function RegisterPage() {
 
       // 3. Si tiene sesión activa (sin confirmación de email), crear organización
       if (authData.session && authData.user) {
-        // El perfil ya fue creado por el trigger, solo actualizamos full_name si es necesario
-        if (fullName) {
-          await supabase
-            .from("profiles")
-            .update({ full_name: fullName })
-            .eq("id", authData.user.id);
-        }
+        // El perfil ya fue creado por el trigger con el full_name del metadata
+        // No necesitamos actualizarlo manualmente
 
         // Crear organización con el plan seleccionado
         const trialEndsAt = selectedPlan === "hobby" 
@@ -102,6 +97,7 @@ export default function RegisterPage() {
 
         const { error: orgError } = await supabase
           .from("organizations")
+          // @ts-ignore - Supabase client types issue in client components
           .insert({
             name: fullName ? `${fullName}'s Organization` : "Mi Organización",
             slug: `${authData.user.id}-${Date.now()}`,
@@ -109,7 +105,7 @@ export default function RegisterPage() {
             plan: selectedPlan as "hobby" | "startup" | "growth",
             trial_ends_at: trialEndsAt,
             subscription_status: selectedPlan === "hobby" ? "trial" : "active",
-          });
+          } as any);
 
         if (orgError) {
           // Si la org ya existe, no es problema (puede pasar si se registra dos veces)

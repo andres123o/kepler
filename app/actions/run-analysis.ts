@@ -90,9 +90,10 @@ export async function runCompleteAnalysis(
     }
     
     // Paso 3: Ejecutar scrapers SOLO UNA VEZ (con cache para evitar ejecuciones duplicadas)
-    const instagramSources = dataSources.filter(s => s.source_type === 'social' && s.social_platform === 'instagram');
-    const linkedInSources = dataSources.filter(s => s.source_type === 'social' && s.social_platform === 'linkedin');
-    const playStoreSources = dataSources.filter(s => s.source_type === 'app_store' && s.app_store_type === 'play_store');
+    const typedSources = (dataSources || []) as Array<{ source_type?: string; social_platform?: string; app_store_type?: string; [key: string]: any }>;
+    const instagramSources = typedSources.filter(s => s.source_type === 'social' && s.social_platform === 'instagram');
+    const linkedInSources = typedSources.filter(s => s.source_type === 'social' && s.social_platform === 'linkedin');
+    const playStoreSources = typedSources.filter(s => s.source_type === 'app_store' && s.app_store_type === 'play_store');
     
     const scrapedData: any = {
       instagram: null,
@@ -301,8 +302,8 @@ export async function runCompleteAnalysis(
     
     // Paso 8: Calcular conteos por fuente para guardarlos en el insight
     const sourceCounts = {
-      instagram: scrapedData.instagram?.reduce((sum, p) => sum + (p.latestComments?.length || 0), 0) || 0,
-      linkedin: scrapedData.linkedin?.reduce((sum, p) => sum + (p.latestComments?.length || 0), 0) || 0,
+      instagram: scrapedData.instagram?.reduce((sum: number, p: any) => sum + (p.latestComments?.length || 0), 0) || 0,
+      linkedin: scrapedData.linkedin?.reduce((sum: number, p: any) => sum + (p.latestComments?.length || 0), 0) || 0,
       playstore: scrapedData.playstore?.length || 0,
       nps: processedFiles.nps.length || 0,
       csat: processedFiles.csat.length || 0,
@@ -314,23 +315,23 @@ export async function runCompleteAnalysis(
     // Para archivos (NPS, CSAT, Tickets): usar datos crudos del CSV para preservar todas las columnas
     const rawData: RawSourceData = {
       // Scrapers - estructura fija
-      instagram: scrapedData.instagram?.flatMap(post => 
-        post.latestComments?.slice(0, 50).map(comment => ({
+      instagram: scrapedData.instagram?.flatMap((post: any) =>
+        post.latestComments?.slice(0, 50).map((comment: any) => ({
           postUrl: post.postUrl,
           text: comment.text,
           username: comment.username,
           timestamp: comment.timestamp,
         })) || []
       ) || undefined,
-      linkedin: scrapedData.linkedin?.flatMap(post => 
-        post.latestComments?.slice(0, 50).map(comment => ({
+      linkedin: scrapedData.linkedin?.flatMap((post: any) =>
+        post.latestComments?.slice(0, 50).map((comment: any) => ({
           postUrl: post.postUrl,
           text: comment.text,
           username: comment.username,
           timestamp: comment.timestamp,
         })) || []
       ) || undefined,
-      playstore: scrapedData.playstore?.slice(0, 100).map(review => ({
+      playstore: scrapedData.playstore?.slice(0, 100).map((review: any) => ({
         id: review.id,
         reviewText: review.reviewText,
         rating: review.rating,
@@ -351,7 +352,7 @@ export async function runCompleteAnalysis(
     });
 
     // Paso 9: Guardar insight en BD
-    const dataSourceIds = dataSources.map(s => s.id);
+    const dataSourceIds = typedSources.map(s => (s as { id: string }).id);
     const insightId = await saveInsightToDatabase(
       organizationId,
       agentResult,
@@ -361,12 +362,14 @@ export async function runCompleteAnalysis(
     );
     
     // Paso 10: Actualizar processing_status de data sources
+    const updateData = { 
+      processing_status: 'completed',
+      last_processed_at: new Date().toISOString(),
+    };
+    // @ts-expect-error - Supabase types issue in server actions
     await supabase
       .from('data_sources')
-      .update({ 
-        processing_status: 'completed',
-        last_processed_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .in('id', dataSourceIds);
     
     const processingTime = Date.now() - startTime;

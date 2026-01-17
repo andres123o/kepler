@@ -33,16 +33,17 @@ export default async function DashboardLayout({
 
   // Si no tiene organización, crearla (fallback)
   if (!organization && profile) {
+    const profileData = profile as { full_name?: string | null; [key: string]: any };
     const { data: newOrg } = await supabase
       .from('organizations')
       .insert({
-        name: `${profile.full_name || 'Usuario'}'s Organization`,
+        name: `${profileData.full_name || 'Usuario'}'s Organization`,
         slug: `${user.id}-${Date.now()}`,
         owner_id: user.id,
         plan: 'hobby',
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         subscription_status: 'trial',
-      })
+      } as any)
       .select()
       .single()
 

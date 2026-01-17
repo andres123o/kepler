@@ -258,21 +258,22 @@ export async function processAllFiles(organizationId: string): Promise<{
   
   // Procesar cada archivo
   for (const source of dataSources || []) {
-    if (!source.file_path || !source.file_type) continue;
+    const sourceData = source as { file_path?: string; file_type?: string; source_type?: string; tickets_method?: string; [key: string]: any };
+    if (!sourceData.file_path || !sourceData.file_type) continue;
     
     try {
-      if (source.source_type === 'nps') {
-        const surveys = await processNPSFile(source.file_path, source.file_type);
+      if (sourceData.source_type === 'nps') {
+        const surveys = await processNPSFile(sourceData.file_path, sourceData.file_type);
         result.nps.push(...surveys);
-      } else if (source.source_type === 'csat') {
-        const surveys = await processCSATFile(source.file_path, source.file_type);
+      } else if (sourceData.source_type === 'csat') {
+        const surveys = await processCSATFile(sourceData.file_path, sourceData.file_type);
         result.csat.push(...surveys);
-      } else if (source.source_type === 'tickets' && source.tickets_method === 'file') {
-        const tickets = await processTicketsFile(source.file_path, source.file_type);
+      } else if (sourceData.source_type === 'tickets' && sourceData.tickets_method === 'file') {
+        const tickets = await processTicketsFile(sourceData.file_path, sourceData.file_type);
         result.tickets.push(...tickets);
       }
     } catch (error: any) {
-      console.error(`Error procesando archivo ${source.source_name}:`, error);
+      console.error(`Error procesando archivo ${sourceData.source_name || 'desconocido'}:`, error);
       // Continuar con otros archivos aunque uno falle
     }
   }

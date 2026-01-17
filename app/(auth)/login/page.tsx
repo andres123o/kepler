@@ -35,7 +35,8 @@ export default function LoginPage() {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        redirect('/login');
+        setError("Error al obtener información del usuario");
+        return;
       }
 
       const { data: profile } = await supabase
@@ -45,10 +46,11 @@ export default function LoginPage() {
         .single()
 
       if (profile) {
+        const profileData = profile as { id: string; full_name?: string | null };
         const { data: organization } = await supabase
           .from('organizations')
           .select('*')
-          .eq('owner_id', profile.id)
+          .eq('owner_id', profileData.id)
           .single()
 
         if (!organization) {
@@ -56,13 +58,13 @@ export default function LoginPage() {
           await supabase
             .from('organizations')
             .insert({
-              name: `${profile.full_name || 'Usuario'}'s Organization`,
-              slug: `${profile.id}-${Date.now()}`,
-              owner_id: profile.id,
+              name: `${profileData.full_name || 'Usuario'}'s Organization`,
+              slug: `${profileData.id}-${Date.now()}`,
+              owner_id: profileData.id,
               plan: 'hobby',
               trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
               subscription_status: 'trial',
-            })
+            } as any)
         }
       }
 
