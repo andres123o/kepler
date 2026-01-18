@@ -37,6 +37,9 @@ export async function scrapeInstagramWeekComments(username: string) {
       }
       await new Promise(resolve => setTimeout(resolve, 2000));
       const runInfo = await client.run(profileRun.id).get();
+      if (!runInfo) {
+        throw new Error('No se pudo obtener información del run');
+      }
       runStatus = runInfo.status;
     }
 
@@ -57,7 +60,7 @@ export async function scrapeInstagramWeekComments(username: string) {
     }
 
     const profile = profileData[0];
-    const latestPosts = profile.latestPosts || [];
+    const latestPosts = (profile.latestPosts as any[]) || [];
 
     if (latestPosts.length === 0) {
       return { 
@@ -120,6 +123,9 @@ export async function scrapeInstagramWeekComments(username: string) {
       }
       await new Promise(resolve => setTimeout(resolve, 2000));
       const runInfo = await client.run(commentsRun.id).get();
+      if (!runInfo) {
+        throw new Error('No se pudo obtener información del run de comentarios');
+      }
       commentsRunStatus = runInfo.status;
     }
 

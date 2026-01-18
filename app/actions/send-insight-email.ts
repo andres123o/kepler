@@ -47,14 +47,16 @@ export async function sendInsightByEmail(
       };
     }
 
-    if (!reportSettings.email_enabled) {
+    const settingsData = reportSettings as { email_enabled?: boolean; email_recipients?: string[]; email_format?: string; [key: string]: any };
+
+    if (!settingsData.email_enabled) {
       return { 
         success: false, 
         error: 'El envío por email no está habilitado. Actívalo en la configuración de reportes.' 
       };
     }
 
-    if (!reportSettings.email_recipients || reportSettings.email_recipients.length === 0) {
+    if (!settingsData.email_recipients || settingsData.email_recipients.length === 0) {
       return { 
         success: false, 
         error: 'No hay destinatarios de email configurados.' 
@@ -73,6 +75,8 @@ export async function sendInsightByEmail(
       return { success: false, error: 'No se encontró el insight' };
     }
 
+    const insightData = insight as { detailed_analysis?: string; summary?: string; title?: string; priority?: string; generation_metadata?: any; [key: string]: any };
+
     // 4. Obtener información de la organización
     const { data: organization, error: orgError } = await supabase
       .from('organizations')
@@ -84,17 +88,26 @@ export async function sendInsightByEmail(
       return { success: false, error: 'No se encontró la organización' };
     }
 
+    const orgData = organization as { name: string; [key: string]: any };
+
     // 5. Extraer título del markdown
-    const markdownContent = insight.detailed_analysis || insight.summary || '';
+    const markdownContent = insightData.detailed_analysis || insightData.summary || '';
     const titleMatch = markdownContent.match(/(?:\*\*)?🎯\s*Foco del Día\s*\(P0\):\s*(.+?)(?:\*\*|$)/i);
-    const title = titleMatch ? titleMatch[1].trim() : insight.title;
+    const title = titleMatch ? titleMatch[1].trim() : insightData.title || '';
 
     // 6. Extraer sourceCounts de generation_metadata
-    const generationMetadata = insight.generation_metadata as Record<string, any> | null;
+    const generationMetadata = insightData.generation_metadata as Record<string, any> | null;
     const sourceCounts: SourceCounts | undefined = generationMetadata?.sourceCounts;
 
     // 7. Formatear fecha
-    const formattedDate = new Date(insight.generated_at).toLocaleDateString('es-ES', {
+    const generatedAt = (insightData as { generated_at?: string | Date }).generated_at;
+    const formattedDate = generatedAt ? new Date(generatedAt).toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) : new Date().toLocaleDateString('es-ES', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
@@ -105,19 +118,19 @@ export async function sendInsightByEmail(
     // 8. Generar HTML y texto plano del email
     const emailHtml = generateInsightEmail({
       title,
-      priority: insight.priority as 'low' | 'medium' | 'high' | 'critical',
+      priority: (insightData.priority || 'medium') as 'low' | 'medium' | 'high' | 'critical',
       generatedAt: formattedDate,
       detailedAnalysis: markdownContent,
-      organizationName: organization.name,
+      organizationName: orgData.name,
       sourceCounts,
     });
 
     const emailText = generateInsightEmailText({
       title,
-      priority: insight.priority as 'low' | 'medium' | 'high' | 'critical',
+      priority: (insightData.priority || 'medium') as 'low' | 'medium' | 'high' | 'critical',
       generatedAt: formattedDate,
       detailedAnalysis: markdownContent,
-      organizationName: organization.name,
+      organizationName: orgData.name,
       sourceCounts,
     });
 
@@ -144,13 +157,13 @@ export async function sendInsightByEmail(
     
     // 11. Filtrar destinatarios: solo permitir emails válidos para pruebas
     // Resend plan gratuito solo permite enviar al email de la cuenta
-    const validRecipients = reportSettings.email_recipients.filter((email: string) => {
+    const validRecipients = settingsData.email_recipients?.filter((email: string) => {
       // Permitir si es el email autorizado o si está en modo producción (con dominio verificado)
       return email.toLowerCase() === allowedTestEmail.toLowerCase();
     });
 
-    if (validRecipients.length === 0) {
-      const recipientsList = reportSettings.email_recipients.join(', ');
+    if (!validRecipients || validRecipients.length === 0) {
+      const recipientsList = settingsData.email_recipients?.join(', ') || '';
       return {
         success: false,
         error: `⚠️ Limitación de prueba: Con el plan gratuito de Resend, solo puedes enviar emails a tu propia dirección de email (${allowedTestEmail}). Los destinatarios configurados (${recipientsList}) no coinciden. Para enviar a otros destinatarios, verifica un dominio en resend.com/domains`
@@ -163,7 +176,7 @@ export async function sendInsightByEmail(
     console.log('📧 Intentando enviar email...');
     console.log('   From:', fromEmail);
     console.log('   To (válidos):', validRecipients);
-    console.log('   To (originales):', reportSettings.email_recipients);
+      console.log('   To (originales):', settingsData.email_recipients);
     console.log('   Subject:', `📊 Nuevo Insight: ${title}`);
     console.log('   HTML length:', emailHtml.length, 'chars');
 
@@ -200,7 +213,7 @@ export async function sendInsightByEmail(
       console.log('📬 Destinatarios válidos:', validRecipients);
       
       // Si se filtraron algunos destinatarios, informar al usuario
-      const filteredCount = reportSettings.email_recipients.length - validRecipients.length;
+      const filteredCount = (settingsData.email_recipients?.length || 0) - validRecipients.length;
       let successMessage = `Reporte enviado exitosamente a ${validRecipients.join(', ')}. ID: ${data.id}`;
       
       if (filteredCount > 0) {

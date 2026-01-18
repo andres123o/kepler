@@ -96,6 +96,9 @@ export async function scrapePlayStoreReviews(appUrl: string, maxReviews: number 
       }
       await new Promise(resolve => setTimeout(resolve, 2000));
       const runInfo = await client.run(playStoreRun.id).get();
+      if (!runInfo) {
+        throw new Error('No se pudo obtener información del run');
+      }
       runStatus = runInfo?.status || runStatus;
       
       if (pollCount % 5 === 0) {

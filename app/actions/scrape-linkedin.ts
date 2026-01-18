@@ -58,6 +58,9 @@ export async function scrapeLinkedInPosts(profileUrl: string) {
       }
       await new Promise(resolve => setTimeout(resolve, 2000));
       const runInfo = await client.run(linkedInRun.id).get();
+      if (!runInfo) {
+        throw new Error('No se pudo obtener información del run');
+      }
       runStatus = runInfo.status;
     }
 

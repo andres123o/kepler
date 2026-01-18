@@ -37,13 +37,14 @@ export async function GET(request: Request) {
 
         // Si aún no existe, crearlo manualmente (fallback)
         if (!profileCheck) {
+          // @ts-ignore - Supabase types issue
           await supabase
             .from('profiles')
             .insert({
               id: data.user.id,
               email: data.user.email!,
               full_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || null,
-            })
+            } as any)
         }
       }
 

@@ -5,6 +5,7 @@
  * para reducir tokens y mejorar identificación de patrones
  */
 
+import OpenAI from 'openai';
 import { Ticket, NPSSurvey, CSATSurvey, PlayStoreReview, InstagramPost, LinkedInPost } from './types';
 // Este archivo ya no se usa (clustering eliminado), pero se mantiene por referencia futura
 

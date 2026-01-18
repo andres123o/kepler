@@ -96,7 +96,8 @@ export async function saveInsightToDatabase(
         .maybeSingle();
       
       if (profile) {
-        assignedTo = profile.id;
+        const profileData = profile as { id: string; [key: string]: any };
+        assignedTo = profileData.id;
       }
     }
   }
@@ -151,6 +152,7 @@ export async function saveInsightToDatabase(
   const confidenceScore = 0.85; // Default, se puede mejorar con lógica más sofisticada
   
   // Insertar insight
+  // @ts-ignore - Supabase types issue
   const { data: insertedInsight, error } = await supabase
     .from('insights')
     .insert({
@@ -175,7 +177,7 @@ export async function saveInsightToDatabase(
       affected_metrics: insight.evidence.count 
         ? { items_analyzed: insight.evidence.count }
         : null,
-    })
+    } as any)
     .select('id')
     .single();
   
@@ -184,7 +186,12 @@ export async function saveInsightToDatabase(
     throw new Error(`Error guardando insight: ${error.message}`);
   }
   
-  return insertedInsight.id;
+  if (!insertedInsight) {
+    throw new Error('No se recibió respuesta al insertar insight');
+  }
+  
+  const insightData = insertedInsight as { id: string; [key: string]: any };
+  return insightData.id;
 }
 
 

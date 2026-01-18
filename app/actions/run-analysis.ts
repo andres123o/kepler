@@ -366,10 +366,10 @@ export async function runCompleteAnalysis(
       processing_status: 'completed',
       last_processed_at: new Date().toISOString(),
     };
-    // @ts-expect-error - Supabase types issue in server actions
-    await supabase
+    await (supabase
       .from('data_sources')
-      .update(updateData)
+      // @ts-ignore - Supabase types issue
+      .update(updateData) as any)
       .in('id', dataSourceIds);
     
     const processingTime = Date.now() - startTime;
@@ -403,13 +403,16 @@ export async function runCompleteAnalysis(
         .eq('organization_id', organizationId);
       
       if (dataSources && dataSources.length > 0) {
-        await supabase
+        const errorUpdateData = { 
+          processing_status: 'error',
+          processing_error: error.message,
+        };
+        const errorIds = (dataSources as Array<{ id: string }>).map((s: { id: string }) => s.id);
+        await (supabase
           .from('data_sources')
-          .update({ 
-            processing_status: 'error',
-            processing_error: error.message,
-          })
-          .in('id', dataSources.map(s => s.id));
+          // @ts-ignore - Supabase types issue
+          .update(errorUpdateData) as any)
+          .in('id', errorIds);
       }
     } catch (updateError) {
       console.error('Error actualizando status:', updateError);
