@@ -40,6 +40,7 @@ export function SettingsPanel({ organization, organizationMembers = [] }: Settin
     try {
       const { error } = await supabase
         .from("organizations")
+        // @ts-ignore - Supabase client types issue with generic table
         .update({ name: orgFormData.name.trim() })
         .eq("id", organization.id);
 

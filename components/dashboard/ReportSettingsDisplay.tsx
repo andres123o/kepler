@@ -80,8 +80,8 @@ export function ReportSettingsDisplay({ settings, organizationId, showEditButton
         .eq('organization_id', organizationId);
       
       if (!error && teamContexts) {
-        const emails = teamContexts
-          .map(tc => ({
+        const emails = (teamContexts as any[])
+          .map((tc: any) => ({
             original: tc.email,
             normalized: tc.email?.trim().toLowerCase()
           }))

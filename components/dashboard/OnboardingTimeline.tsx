@@ -89,10 +89,10 @@ export function OnboardingTimeline({ progress, onStepClick }: OnboardingTimeline
   const activeStepRef = useRef<HTMLDivElement>(null);
 
   // Determinar cuál es el paso activo
-  const step1Done = progress?.step_1_completed === true || progress?.step_1_completed === 'true';
-  const step2Done = progress?.step_2_completed === true || progress?.step_2_completed === 'true';
-  const step3Done = progress?.step_3_completed === true || progress?.step_3_completed === 'true';
-  const step4Done = progress?.step_4_completed === true || progress?.step_4_completed === 'true';
+  const step1Done = progress?.step_1_completed === true;
+  const step2Done = progress?.step_2_completed === true;
+  const step3Done = progress?.step_3_completed === true;
+  const step4Done = progress?.step_4_completed === true;
   
   let activeStepNumber = 1;
   if (step1Done && !step2Done) activeStepNumber = 2;
@@ -146,11 +146,10 @@ export function OnboardingTimeline({ progress, onStepClick }: OnboardingTimeline
           const Icon = step.icon;
           
           // Determinar si está completado directamente desde progress
-          // Manejar diferentes formatos: boolean true, string "true", o null/undefined/false
-          const step1Done = progress?.step_1_completed === true || progress?.step_1_completed === 'true';
-          const step2Done = progress?.step_2_completed === true || progress?.step_2_completed === 'true';
-          const step3Done = progress?.step_3_completed === true || progress?.step_3_completed === 'true';
-          const step4Done = progress?.step_4_completed === true || progress?.step_4_completed === 'true';
+          const step1Done = progress?.step_1_completed === true;
+          const step2Done = progress?.step_2_completed === true;
+          const step3Done = progress?.step_3_completed === true;
+          const step4Done = progress?.step_4_completed === true;
           
           let isCompleted = false;
           if (step.number === 1) {

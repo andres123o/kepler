@@ -51,7 +51,7 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
           ),
           p: ({ children, node }) => {
             // Si el párrafo está dentro de un <li>, no agregar margin-bottom extra
-            const isInsideListItem = node?.position?.start?.column > 1;
+            const isInsideListItem = (node?.position?.start?.column ?? 0) > 1;
             return (
               <p 
                 className={`text-neutral-700 leading-relaxed ${isInsideListItem ? 'mb-0' : 'mb-4'}`}

@@ -395,7 +395,7 @@ export function FileUploadModal({ isOpen, onClose, onComplete, missingFiles }: F
                                 handleFileSelect(file.sourceId, selectedFile);
                               }}
                               className="hidden"
-                              disabled={status === "uploading" || status === "success"}
+                              disabled={status === "parsing" || status === "success"}
                             />
                             <div className="flex items-center gap-3">
                               <div
@@ -404,7 +404,7 @@ export function FileUploadModal({ isOpen, onClose, onComplete, missingFiles }: F
                                     ? "border-green-300 bg-green-50/50"
                                     : "border-neutral-300 hover:border-neutral-400"
                                 } ${
-                                  status === "uploading" || status === "success"
+                                  status === "parsing" || status === "success"
                                     ? "opacity-50 cursor-not-allowed"
                                     : "cursor-pointer"
                                 }`}

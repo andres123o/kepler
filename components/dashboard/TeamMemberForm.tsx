@@ -57,7 +57,7 @@ export function TeamMemberForm({ organizationId, onCancel, showFormOnly = false 
         throw new Error("Este usuario no tiene una cuenta en el sistema. Por favor, pídele que se registre primero o envía una invitación.");
       }
 
-      const profileId = existingProfile.id;
+      const profileId = (existingProfile as any).id;
 
       // Verificar si el miembro ya existe en la organización
       const { data: existingMember } = await supabase
@@ -74,6 +74,7 @@ export function TeamMemberForm({ organizationId, onCancel, showFormOnly = false 
       // Insertar miembro en la organización
       const { error: insertError } = await supabase
         .from("organization_members")
+        // @ts-ignore - Supabase client types issue with generic table
         .insert({
           organization_id: organizationId,
           user_id: profileId,
@@ -102,6 +103,7 @@ export function TeamMemberForm({ organizationId, onCancel, showFormOnly = false 
           // Actualizar progreso existente
           await supabase
             .from("onboarding_progress")
+            // @ts-ignore - Supabase client types issue with generic table
             .update({
               step_2_completed: true,
               step_2_completed_at: new Date().toISOString(),
@@ -111,6 +113,7 @@ export function TeamMemberForm({ organizationId, onCancel, showFormOnly = false 
           // Crear registro de progreso
           await supabase
             .from("onboarding_progress")
+            // @ts-ignore - Supabase client types issue with generic table
             .insert({
               organization_id: organizationId,
               step_2_completed: true,
