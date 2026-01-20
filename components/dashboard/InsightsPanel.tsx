@@ -80,7 +80,7 @@ export function InsightsPanel({ organizationId }: InsightsPanelProps) {
 
   // Si hay un insight seleccionado, mostrar el reporte completo in-page
   if (selectedInsight) {
-    return (
+  return (
       <div className="max-w-5xl mx-auto">
         {/* Botón para volver */}
         <motion.button
@@ -100,39 +100,39 @@ export function InsightsPanel({ organizationId }: InsightsPanelProps) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h2 
-          className="text-3xl font-bold text-neutral-900 mb-2"
-          style={{
-            fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-            fontWeight: 700,
-            letterSpacing: '-0.02em'
-          }}
-        >
-          Historial de insights
-        </h2>
-        <p 
-          className="text-neutral-600"
-          style={{
-            fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-          }}
-        >
-          {insights.length} insight{insights.length !== 1 ? 's' : ''} generado{insights.length !== 1 ? 's' : ''} por IA
-        </p>
+      <div className="max-w-5xl mx-auto">
+        <div className="mb-8">
+          <h2 
+            className="text-3xl font-bold text-neutral-900 mb-2"
+            style={{
+              fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+              fontWeight: 700,
+              letterSpacing: '-0.02em'
+            }}
+          >
+            Historial de insights
+          </h2>
+          <p 
+            className="text-neutral-600"
+            style={{
+              fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+            }}
+          >
+            {insights.length} insight{insights.length !== 1 ? 's' : ''} generado{insights.length !== 1 ? 's' : ''} por IA
+          </p>
+        </div>
+        
+        <div className="space-y-3">
+          {insights.map((insight, index) => (
+            <InsightCompactCard 
+              key={insight.id} 
+              insight={insight} 
+              index={index}
+              onView={() => setSelectedInsight(insight)}
+            />
+          ))}
+        </div>
       </div>
-      
-      <div className="space-y-3">
-        {insights.map((insight, index) => (
-          <InsightCompactCard 
-            key={insight.id} 
-            insight={insight} 
-            index={index}
-            onView={() => setSelectedInsight(insight)}
-          />
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -252,7 +252,7 @@ function InsightFullView({ insight }: { insight: any }) {
   
   const titleMatch = markdownContent.match(/(?:\*\*)?🎯\s*Foco del Día\s*\(P0\):\s*(.+?)(?:\*\*|$)/i);
   const title = titleMatch ? titleMatch[1].trim() : insight.title;
-
+  
   const priorityColors = {
     critical: "from-red-500/10 to-red-600/10 border-red-200/50",
     high: "from-orange-500/10 to-orange-600/10 border-orange-200/50",
@@ -654,7 +654,7 @@ function SourceDataModal({ isOpen, onClose, sourceType, sourceLabel, data }: Sou
       }
     }
   };
-
+  
   return (
     <>
       {/* Overlay */}
@@ -683,11 +683,11 @@ function SourceDataModal({ isOpen, onClose, sourceType, sourceLabel, data }: Sou
             <div>
               <h3
                 className="text-lg font-bold text-neutral-900"
-                style={{
-                  fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-                  fontWeight: 700,
-                }}
-              >
+            style={{
+              fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+              fontWeight: 700,
+            }}
+          >
                 Datos de {sourceLabel}
               </h3>
               <p className="text-sm text-neutral-500">
@@ -706,8 +706,8 @@ function SourceDataModal({ isOpen, onClose, sourceType, sourceLabel, data }: Sou
         {/* Table Container with scroll */}
         <div className="flex-1 overflow-auto">
           {renderTable()}
-        </div>
-
+            </div>
+            
         {/* Footer */}
         <div className="px-6 py-4 border-t border-neutral-200 bg-neutral-50/50 flex justify-between items-center">
           <p className="text-xs text-neutral-500">

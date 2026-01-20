@@ -743,8 +743,8 @@ export function DashboardContent({ organization, insights = [], dataSources = []
                 fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
               }}
             >
-              <Sparkles className="w-5 h-5" />
-              <span>Iniciar Análisis de Voz de Cliente</span>
+                  <Sparkles className="w-5 h-5" />
+                  <span>Iniciar Análisis de Voz de Cliente</span>
             </motion.button>
             
             {!hasSocialSources && !hasDataSources && (
@@ -1343,8 +1343,8 @@ function FullInsightReport({
             fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
           }}
         >
-          <Sparkles className="w-4 h-4" />
-          <span>Nuevo análisis</span>
+              <Sparkles className="w-4 h-4" />
+              <span>Nuevo análisis</span>
         </motion.button>
       </div>
 

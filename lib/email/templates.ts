@@ -186,8 +186,8 @@ export function generateInsightEmail(data: InsightEmailData): string {
                     <p style="margin: 0 0 12px 0; font-size: 11px; color: #737373; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
                       En el reporte completo:
                     </p>
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-                      <tr>
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
                         <td style="padding: 4px 0;">
                           <span style="color: #10B981; font-size: 14px;">✓</span>
                           <span style="margin-left: 8px; color: #525252; font-size: 13px;">Análisis completo del problema</span>
@@ -209,12 +209,12 @@ export function generateInsightEmail(data: InsightEmailData): string {
                         <td style="padding: 4px 0;">
                           <span style="color: #10B981; font-size: 14px;">✓</span>
                           <span style="margin-left: 8px; color: #525252; font-size: 13px;">Evidencia y tickets relacionados</span>
-                        </td>
+                    </td>
                       </tr>
                     </table>
-                  </td>
-                </tr>
-              </table>
+                    </td>
+                  </tr>
+                </table>
             </td>
           </tr>
 
@@ -236,7 +236,7 @@ export function generateInsightEmail(data: InsightEmailData): string {
                   <td style="text-align: center;">
                     <p style="margin: 0 0 4px 0; font-size: 12px; color: #737373;">
                       Generado por Kepler AI para <strong style="color: #525252;">${data.organizationName}</strong>
-                    </p>
+              </p>
                     <p style="margin: 0; font-size: 11px; color: #a3a3a3;">
                       ${data.generatedAt}
                     </p>

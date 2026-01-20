@@ -61,6 +61,7 @@ export async function GET(request: Request) {
           ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
           : null
 
+        // @ts-ignore - Supabase types issue
         await supabase
           .from('organizations')
           .insert({
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
             plan: plan as 'hobby' | 'startup' | 'growth',
             trial_ends_at: trialEndsAt,
             subscription_status: plan === 'hobby' ? 'trial' : 'active',
-          })
+          } as any)
       }
     }
 

@@ -64,6 +64,7 @@ interface DashboardPanelsProps {
   dataSources?: DataSource[];
   reportSettings?: ReportSettings;
   organizationMembers?: TeamMember[];
+  organization?: any;
 }
 
 export function DashboardPanels({ activePanel, organizationId, businessContexts = [], teamContexts = [], dataSources = [], reportSettings, organizationMembers = [], organization }: DashboardPanelsProps) {
