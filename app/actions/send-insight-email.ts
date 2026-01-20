@@ -143,48 +143,93 @@ export async function sendInsightByEmail(
       };
     }
 
-    // 10. Obtener el email del usuario autenticado (para validar restricción de Resend)
-    // Con el plan gratuito de Resend, solo puedes enviar a tu propia dirección de email
-    // Puedes configurar RESEND_TEST_EMAIL en .env.local si quieres usar otro email
-    const allowedTestEmail = process.env.RESEND_TEST_EMAIL || user.email;
+    // 10. Obtener todos los correos del equipo desde la base de datos
+    // Obtener emails de team_context
+    const { data: teamContexts, error: teamContextsError } = await supabase
+      .from('team_context')
+      .select('email')
+      .eq('organization_id', organizationId)
+      .not('email', 'is', null);
+
+    // Obtener emails de organization_members (a través de profiles)
+    const { data: organizationMembers, error: membersError } = await supabase
+      .from('organization_members')
+      .select(`
+        *,
+        profiles:user_id (
+          email
+        )
+      `)
+      .eq('organization_id', organizationId);
+
+    // Combinar todos los correos del equipo
+    const teamEmails = new Set<string>();
     
-    if (!allowedTestEmail) {
-      return {
-        success: false,
-        error: 'No se pudo determinar el email autorizado para pruebas. Por favor, configura RESEND_TEST_EMAIL en .env.local'
-      };
+    // Agregar emails de team_context
+    if (teamContexts && !teamContextsError) {
+      (teamContexts as any[]).forEach((tc: any) => {
+        const email = tc.email?.trim().toLowerCase();
+        if (email && email.includes('@')) {
+          teamEmails.add(email);
+        }
+      });
     }
+
+    // Agregar emails de organization_members
+    if (organizationMembers && !membersError) {
+      (organizationMembers as any[]).forEach((member: any) => {
+        const email = member.profiles?.email?.trim().toLowerCase();
+        if (email && email.includes('@')) {
+          teamEmails.add(email);
+        }
+      });
+    }
+
+    // 11. Combinar correos del equipo con correos externos configurados
+    const allRecipients = new Set<string>();
     
-    // 11. Filtrar destinatarios: solo permitir emails válidos para pruebas
-    // Resend plan gratuito solo permite enviar al email de la cuenta
-    const validRecipients = settingsData.email_recipients?.filter((email: string) => {
-      // Permitir si es el email autorizado o si está en modo producción (con dominio verificado)
-      return email.toLowerCase() === allowedTestEmail.toLowerCase();
+    // Agregar correos del equipo
+    teamEmails.forEach(email => allRecipients.add(email));
+    
+    // Agregar correos externos configurados (que no sean del equipo)
+    settingsData.email_recipients?.forEach((email: string) => {
+      const emailLower = email.trim().toLowerCase();
+      if (emailLower && emailLower.includes('@')) {
+        allRecipients.add(emailLower);
+      }
     });
 
-    if (!validRecipients || validRecipients.length === 0) {
-      const recipientsList = settingsData.email_recipients?.join(', ') || '';
+    // Convertir a array y validar
+    const validRecipients = Array.from(allRecipients).filter(email => {
+      // Validar formato básico de email
+      return email && email.includes('@') && email.length > 3;
+    });
+
+    if (validRecipients.length === 0) {
       return {
         success: false,
-        error: `⚠️ Limitación de prueba: Con el plan gratuito de Resend, solo puedes enviar emails a tu propia dirección de email (${allowedTestEmail}). Los destinatarios configurados (${recipientsList}) no coinciden. Para enviar a otros destinatarios, verifica un dominio en resend.com/domains`
+        error: 'No se encontraron destinatarios válidos. Asegúrate de tener miembros del equipo con correos configurados o agrega correos externos en la configuración de reportes.'
       };
     }
 
     // 12. Preparar configuración del email
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Kepler <onboarding@resend.dev>';
+    // IMPORTANTE: El dominio debe estar verificado en Resend (iskepler.com)
+    // Formato: "Nombre <email@dominio-verificado.com>"
+    // Si el dominio está verificado, puedes usar cualquier email@iskepler.com
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Kepler <hola@iskepler.com>';
     
     console.log('📧 Intentando enviar email...');
     console.log('   From:', fromEmail);
-    console.log('   To (válidos):', validRecipients);
-      console.log('   To (originales):', settingsData.email_recipients);
+    console.log('   To (destinatarios):', validRecipients);
+    console.log('   Total destinatarios:', validRecipients.length);
     console.log('   Subject:', `📊 Nuevo Insight: ${title}`);
     console.log('   HTML length:', emailHtml.length, 'chars');
 
-    // 13. Enviar email usando formato oficial de Resend (solo a destinatarios válidos)
+    // 13. Enviar email usando formato oficial de Resend a todos los destinatarios
     try {
       const { data, error } = await resend.emails.send({
         from: fromEmail,
-        to: validRecipients, // Solo emails autorizados para pruebas
+        to: validRecipients, // Todos los correos del equipo y externos configurados
         subject: `📊 Nuevo Insight: ${title}`,
         html: emailHtml,
         text: emailText,
@@ -210,15 +255,9 @@ export async function sendInsightByEmail(
 
       console.log('✅ Email enviado exitosamente');
       console.log('📧 ID del email:', data.id);
-      console.log('📬 Destinatarios válidos:', validRecipients);
+      console.log('📬 Destinatarios:', validRecipients);
       
-      // Si se filtraron algunos destinatarios, informar al usuario
-      const filteredCount = (settingsData.email_recipients?.length || 0) - validRecipients.length;
-      let successMessage = `Reporte enviado exitosamente a ${validRecipients.join(', ')}. ID: ${data.id}`;
-      
-      if (filteredCount > 0) {
-        successMessage += `\n\n⚠️ Nota: ${filteredCount} destinatario(s) fueron omitidos porque con el plan gratuito de Resend solo puedes enviar a tu propia dirección de email. Para enviar a otros destinatarios, verifica un dominio en resend.com/domains`;
-      }
+      const successMessage = `Reporte enviado exitosamente a ${validRecipients.length} destinatario(s): ${validRecipients.join(', ')}. ID: ${data.id}`;
 
       return { 
         success: true, 
