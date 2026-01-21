@@ -25,8 +25,12 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "BI Insights - Transforma tus datos en decisiones inteligentes",
-  description: "Plataforma de Business Intelligence que convierte tus datos en insights accionables con inteligencia artificial.",
+  title: "Kepler AI",
+  description:
+    "Plataforma de Business Intelligence que convierte tus datos en insights accionables con inteligencia artificial.",
+  icons: {
+    icon: "https://res.cloudinary.com/dmyq0gr14/image/upload/v1765342242/unnamed-removebg-preview_xa4cji.png",
+  },
 };
 
 export default function RootLayout({
