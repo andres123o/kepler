@@ -1,18 +1,33 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+// Función helper para obtener la URL base correcta
+function getBaseUrl(requestUrl: URL): string {
+  // En producción, usar la URL de producción
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL
+  }
+  // Si estamos en producción (no localhost), usar iskepler.com
+  if (requestUrl.hostname !== 'localhost' && !requestUrl.hostname.includes('127.0.0.1')) {
+    return 'https://www.iskepler.com'
+  }
+  // En desarrollo local, usar el origin de la request
+  return requestUrl.origin
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const plan = requestUrl.searchParams.get('plan') || 'hobby'
   const next = requestUrl.searchParams.get('next') || '/dashboard'
+  const baseUrl = getBaseUrl(requestUrl)
 
   if (code) {
     const supabase = await createClient()
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (error) {
-      return NextResponse.redirect(`${requestUrl.origin}/register?error=${error.message}`)
+      return NextResponse.redirect(`${baseUrl}/login?error=${encodeURIComponent(error.message)}`)
     }
 
     if (data.user) {
@@ -75,9 +90,9 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.redirect(`${requestUrl.origin}${next}`)
+    return NextResponse.redirect(`${baseUrl}${next}`)
   }
 
-  return NextResponse.redirect(`${requestUrl.origin}/register`)
+  return NextResponse.redirect(`${baseUrl}/login`)
 }
 

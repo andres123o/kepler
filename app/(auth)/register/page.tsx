@@ -56,6 +56,14 @@ function RegisterForm() {
     setIsLoading(true);
 
     try {
+      // Determinar la URL base para redirecciones
+      let baseUrl = window.location.origin;
+      if (process.env.NEXT_PUBLIC_APP_URL) {
+        baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+      } else if (window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1')) {
+        baseUrl = 'https://www.iskepler.com';
+      }
+
       // 1. Crear usuario en Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -64,6 +72,7 @@ function RegisterForm() {
           data: {
             full_name: fullName,
           },
+          emailRedirectTo: `${baseUrl}/auth/callback?plan=${selectedPlan}`,
         },
       });
 
@@ -129,10 +138,21 @@ function RegisterForm() {
     setIsOAuthLoading(true);
 
     try {
+      // Determinar la URL base: usar variable de entorno, o detectar producción, o usar origin actual
+      let baseUrl = window.location.origin;
+      if (process.env.NEXT_PUBLIC_APP_URL) {
+        baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+      } else if (window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1')) {
+        // En producción, usar la URL de producción
+        baseUrl = 'https://www.iskepler.com';
+      }
+      
+      const redirectUrl = `${baseUrl}/auth/callback?plan=${selectedPlan}`;
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?plan=${selectedPlan}`,
+          redirectTo: redirectUrl,
         },
       });
 
