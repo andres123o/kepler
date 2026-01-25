@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { fetchCompanyContext } from '@/app/actions/fetch-company-context'
+import { generateFirstAnalysis } from '@/app/actions/generate-first-analysis'
 
 // Función helper para obtener la URL base correcta
 function getBaseUrl(requestUrl: URL): string {
@@ -74,12 +75,19 @@ export async function GET(request: Request) {
       let organization = existingOrg as any
 
       if (!existingOrg) {
+        // Obtener datos del registro desde user_metadata
+        const companyName = data.user.user_metadata?.company_name || ''
+        const instagramUsername = data.user.user_metadata?.instagram_username || ''
+        const playStoreUrl = data.user.user_metadata?.playstore_url || ''
+        const registrationPlan = data.user.user_metadata?.registration_plan || plan
+
         // Crear organización con el plan seleccionado
-        const trialEndsAt = plan === 'hobby' 
+        const trialEndsAt = registrationPlan === 'hobby' 
           ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
           : null
 
-        const orgName = `${data.user.user_metadata?.full_name || data.user.user_metadata?.name || 'Usuario'}'s Organization`
+        // Usar nombre de empresa si está disponible, sino usar el nombre completo
+        const orgName = companyName.trim() || `${data.user.user_metadata?.full_name || data.user.user_metadata?.name || 'Usuario'}'s Organization`
 
         // @ts-ignore - Supabase types issue
         const { data: newOrg, error: orgError } = await supabase
@@ -88,9 +96,9 @@ export async function GET(request: Request) {
             name: orgName,
             slug: `${data.user.id}-${Date.now()}`,
             owner_id: data.user.id,
-            plan: plan as 'hobby' | 'startup' | 'growth',
+            plan: registrationPlan as 'hobby' | 'startup' | 'growth',
             trial_ends_at: trialEndsAt,
-            subscription_status: plan === 'hobby' ? 'trial' : 'active',
+            subscription_status: registrationPlan === 'hobby' ? 'trial' : 'active',
           } as any)
           .select('id, name')
           .single()
@@ -98,20 +106,63 @@ export async function GET(request: Request) {
         if (!orgError && newOrg) {
           organization = newOrg as any
 
-          // Ejecutar scraping de contexto de empresa en background (no bloquea)
-          // Intentar extraer nombre de empresa del nombre de la organización
-          const companyName = orgName.replace("'s Organization", "").trim()
-          if (companyName && companyName !== 'Usuario' && organization?.id) {
-            fetchCompanyContext(organization.id, companyName, data.user.id)
+          // Crear data_sources si se proporcionaron datos
+          if (instagramUsername.trim() || playStoreUrl.trim()) {
+            const dataSourcesToCreate: any[] = []
+            
+            // Instagram data source
+            if (instagramUsername.trim()) {
+              const cleanInstagram = instagramUsername.trim().replace(/^@/, '').replace(/\s+/g, '')
+              dataSourcesToCreate.push({
+                organization_id: organization.id,
+                source_type: 'social',
+                source_name: 'Instagram',
+                social_platform: 'instagram',
+                social_username: cleanInstagram,
+                uploaded_by: data.user.id,
+              })
+            }
+            
+            // Play Store data source
+            if (playStoreUrl.trim()) {
+              dataSourcesToCreate.push({
+                organization_id: organization.id,
+                source_type: 'app_store',
+                source_name: 'Play Store',
+                app_store_type: 'play_store',
+                app_url: playStoreUrl.trim(),
+                uploaded_by: data.user.id,
+              })
+            }
+            
+            // Insertar data sources
+            if (dataSourcesToCreate.length > 0) {
+              // @ts-ignore
+              await supabase
+                .from('data_sources')
+                .insert(dataSourcesToCreate as any)
+            }
+          }
+
+          // Ejecutar generación de primer análisis en background (no bloquea)
+          // Esto ejecuta: scraping de contexto empresa + Instagram + Play Store + análisis automático
+          if (companyName.trim()) {
+            generateFirstAnalysis(
+              organization.id,
+              companyName.trim(),
+              data.user.id,
+              instagramUsername.trim() || undefined,
+              playStoreUrl.trim() || undefined
+            )
               .then((result) => {
                 if (result.success) {
-                  console.log(`✅ Contexto de empresa guardado desde callback: ${result.saved} registros`)
+                  console.log(`✅ Primer análisis generado exitosamente desde callback: ${result.insightId}`)
                 } else {
-                  console.error(`⚠️ Error al obtener contexto desde callback: ${result.error}`)
+                  console.error(`⚠️ Error al generar primer análisis desde callback: ${result.error}`)
                 }
               })
               .catch((error) => {
-                console.error('⚠️ Error al ejecutar fetchCompanyContext desde callback:', error)
+                console.error('⚠️ Error al ejecutar generateFirstAnalysis desde callback:', error)
               })
           }
         }

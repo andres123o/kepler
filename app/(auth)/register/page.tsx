@@ -129,12 +129,17 @@ function RegisterForm() {
       }
 
       // 1. Crear usuario en Supabase Auth
+      // Guardar datos del formulario en user_metadata para que estén disponibles después de confirmar email
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
+            company_name: companyName.trim(),
+            instagram_username: instagramUsername.trim(),
+            playstore_url: playStoreUrl.trim(),
+            registration_plan: selectedPlan,
           },
           emailRedirectTo: `${baseUrl}/auth/callback?plan=${selectedPlan}`,
         },
