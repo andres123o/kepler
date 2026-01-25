@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import OpenAI from 'openai'
 
 interface SerpAPIResult {
@@ -187,6 +188,89 @@ export async function fetchCompanyContext(
     }
   } catch (error: any) {
     console.error('❌ Error en fetchCompanyContext:', error.message)
+    return {
+      success: false,
+      error: error.message || 'Error desconocido',
+    }
+  }
+}
+
+/**
+ * Versión que usa admin client (para ejecutarse sin sesión activa)
+ */
+export async function fetchCompanyContextWithAdmin(
+  organizationId: string,
+  companyName: string,
+  userId: string
+) {
+  if (!organizationId || !companyName || !userId) {
+    console.error('❌ Parámetros faltantes para fetchCompanyContextWithAdmin')
+    return { success: false, error: 'Parámetros faltantes' }
+  }
+
+  console.log(`🔍 Iniciando búsqueda de contexto para: ${companyName} (con admin client)`)
+
+  try {
+    // Usar admin client porque se ejecuta sin sesión activa
+    const supabase = createAdminClient()
+
+    // Definir las 4 consultas
+    const queries = [
+      { type: 'Misión', query: `${companyName} misión` },
+      { type: 'Visión', query: `${companyName} visión` },
+      { type: 'Metas 2026', query: `${companyName} metas 2026 objetivos` },
+      { type: 'Qué hace la empresa', query: `${companyName} qué hace empresa servicios productos` },
+    ]
+
+    // Ejecutar las 4 búsquedas en SerpAPI en paralelo
+    console.log('📡 Ejecutando 4 consultas a SerpAPI en paralelo...')
+    const serpResults = await Promise.all(
+      queries.map(({ query }) => searchWithSerpAPI(query))
+    )
+
+    // Procesar cada resultado con OpenAI en paralelo
+    console.log('🤖 Procesando resultados con OpenAI en paralelo...')
+    const cleanedResults = await Promise.all(
+      queries.map(({ type }, index) =>
+        cleanWithOpenAI(serpResults[index], type)
+      )
+    )
+
+    // Preparar los contextos para guardar
+    const contextsToSave = queries
+      .map(({ type }, index) => ({
+        name: type,
+        content: cleanedResults[index],
+        organization_id: organizationId,
+        created_by: userId,
+      }))
+      .filter((ctx) => ctx.content && ctx.content.length > 0) // Solo guardar si hay contenido
+
+    if (contextsToSave.length === 0) {
+      console.log('⚠️ No se encontró información relevante para guardar')
+      return { success: true, saved: 0, message: 'No se encontró información relevante' }
+    }
+
+    // Guardar todos los contextos en una sola transacción
+    console.log(`💾 Guardando ${contextsToSave.length} contextos en business_context...`)
+    // @ts-ignore - Supabase types issue with admin client
+    const { error: insertError } = await supabase
+      .from('business_context')
+      .insert(contextsToSave as any)
+
+    if (insertError) {
+      console.error('❌ Error al guardar contextos:', insertError)
+      throw insertError
+    }
+
+    console.log(`✅ Contexto guardado exitosamente: ${contextsToSave.length} registros`)
+    return {
+      success: true,
+      saved: contextsToSave.length,
+      contexts: contextsToSave.map((c) => c.name),
+    }
+  } catch (error: any) {
+    console.error('❌ Error en fetchCompanyContextWithAdmin:', error.message)
     return {
       success: false,
       error: error.message || 'Error desconocido',

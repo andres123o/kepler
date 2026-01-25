@@ -1,10 +1,10 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { fetchCompanyContext } from './fetch-company-context'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchCompanyContextWithAdmin } from './fetch-company-context'
 import { scrapeInstagramWeekComments } from './scrape-instagram'
 import { scrapePlayStoreReviews } from './scrape-playstore'
-import { runCompleteAnalysis } from './run-analysis'
+import { runCompleteAnalysisWithAdmin } from './run-analysis'
 
 /**
  * Ejecuta todos los scrapings y genera el primer análisis automáticamente
@@ -20,7 +20,8 @@ export async function generateFirstAnalysis(
   console.log(`🚀 Iniciando generación de primer análisis para organización: ${organizationId}`)
   
   try {
-    const supabase = await createClient()
+    // Usar admin client porque se ejecuta sin sesión activa
+    const supabase = createAdminClient()
 
     // Paso 1: Ejecutar scraping de contexto de empresa (si no existe)
     console.log('📋 Verificando contexto de empresa...')
@@ -33,7 +34,7 @@ export async function generateFirstAnalysis(
     let companyContextDone = false
     if (!existingContext || existingContext.length === 0) {
       console.log('🔍 Ejecutando scraping de contexto de empresa...')
-      const contextResult = await fetchCompanyContext(organizationId, companyName, userId)
+      const contextResult = await fetchCompanyContextWithAdmin(organizationId, companyName, userId)
       if (contextResult.success) {
         console.log(`✅ Contexto de empresa guardado: ${contextResult.saved} registros`)
         companyContextDone = true
@@ -106,7 +107,7 @@ export async function generateFirstAnalysis(
 
     // Paso 4: Generar análisis automáticamente
     console.log('🤖 Generando primer análisis automático...')
-    const analysisResult = await runCompleteAnalysis(organizationId)
+    const analysisResult = await runCompleteAnalysisWithAdmin(organizationId)
 
     if (analysisResult.success) {
       console.log(`✅ Primer análisis generado exitosamente. Insight ID: ${analysisResult.insightId}`)
