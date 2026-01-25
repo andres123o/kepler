@@ -9,6 +9,7 @@ import { useDashboard } from "./DashboardContext";
 import { runCompleteAnalysis } from "@/app/actions/run-analysis";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 import { sendInsightByEmail } from "@/app/actions/send-insight-email";
+import { createClient } from "@/lib/supabase/client";
 
 interface DashboardContentProps {
   organization: any;
@@ -261,8 +262,11 @@ export function DashboardContent({ organization, insights = [], dataSources = []
   const [showFileUploadModal, setShowFileUploadModal] = useState(false);
   const [showAllSourcesModal, setShowAllSourcesModal] = useState(false);
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
+  const [isFirstLogin, setIsFirstLogin] = useState(false);
+  const [isProcessingFirstAnalysis, setIsProcessingFirstAnalysis] = useState(false);
   const { setActivePanel } = useDashboard();
   const router = useRouter();
+  const supabase = createClient();
 
   // Filtrar fuentes de redes sociales
   const instagramSources = dataSources.filter(
@@ -299,6 +303,63 @@ export function DashboardContent({ organization, insights = [], dataSources = []
   
   const hasSocialSources = instagramSources.length > 0 || linkedInSources.length > 0 || playStoreSources.length > 0;
   const hasDataSources = dataSources.length > 0;
+
+  // Detectar si es primer login (no hay insights y hay data sources)
+  useEffect(() => {
+    if (insights.length === 0 && dataSources.length > 0 && businessContexts.length > 0) {
+      setIsFirstLogin(true);
+      setIsProcessingFirstAnalysis(true);
+      
+      // Polling para verificar si el análisis está listo (cada 5 segundos, máximo 3 minutos)
+      let pollCount = 0;
+      const maxPolls = 36; // 3 minutos (36 * 5 segundos)
+      
+      const pollInterval = setInterval(async () => {
+        pollCount++;
+        
+        try {
+          const { data: latestInsights } = await supabase
+            .from('insights')
+            .select('*')
+            .eq('organization_id', organization.id)
+            .order('generated_at', { ascending: false })
+            .limit(1);
+          
+          if (latestInsights && latestInsights.length > 0) {
+            // Análisis listo!
+            const firstInsight = latestInsights[0] as any;
+            if (firstInsight?.id) {
+              setIsProcessingFirstAnalysis(false);
+              setIsFirstLogin(false);
+              clearInterval(pollInterval);
+              // Refrescar y luego seleccionar el insight
+              router.refresh();
+              // Esperar un momento para que el refresh complete y luego seleccionar
+              setTimeout(() => {
+                setSelectedInsightId(firstInsight.id);
+              }, 500);
+            }
+          } else if (pollCount >= maxPolls) {
+            // Tiempo máximo alcanzado
+            setIsProcessingFirstAnalysis(false);
+            clearInterval(pollInterval);
+          }
+        } catch (error) {
+          console.error('Error verificando insights:', error);
+          if (pollCount >= maxPolls) {
+            setIsProcessingFirstAnalysis(false);
+            clearInterval(pollInterval);
+          }
+        }
+      }, 5000); // Verificar cada 5 segundos
+      
+      // Limpiar intervalo al desmontar
+      return () => clearInterval(pollInterval);
+    } else {
+      setIsFirstLogin(false);
+      setIsProcessingFirstAnalysis(false);
+    }
+  }, [insights.length, dataSources.length, businessContexts.length, organization.id, router, supabase]);
 
   // Ordenar insights por fecha (más reciente primero)
   const sortedInsights = useMemo(() => {
@@ -718,6 +779,35 @@ export function DashboardContent({ organization, insights = [], dataSources = []
             hasSources={hasSocialSources || hasDataSources}
             organizationId={organization.id}
           />
+        ) : isProcessingFirstAnalysis ? (
+          // Estado de procesamiento del primer análisis (loader pequeño)
+          <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center gap-4"
+            >
+              <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
+              <div>
+                <h3 
+                  className="text-xl font-semibold text-neutral-900 mb-2"
+                  style={{
+                    fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                  }}
+                >
+                  Preparando tu primer análisis
+                </h3>
+                <p 
+                  className="text-sm text-neutral-500"
+                  style={{
+                    fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                  }}
+                >
+                  Estamos recopilando datos y generando insights automáticamente...
+                </p>
+              </div>
+            </motion.div>
+          </div>
         ) : (
           // Estado vacío: título y botón solamente
           <div className="flex flex-col items-center justify-center min-h-[400px] text-center">

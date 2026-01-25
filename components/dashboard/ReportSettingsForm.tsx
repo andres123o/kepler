@@ -497,17 +497,17 @@ export function ReportSettingsForm({ organizationId, existingSettings, onCancel 
                         <p className="text-xs font-semibold text-neutral-500 mb-2 uppercase tracking-wide">
                           👥 Miembros del equipo
                         </p>
-                        <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
                           {formData.email_recipients
                             .filter(email => isTeamEmail(email))
                             .map((email) => (
-                              <motion.span
-                                key={email}
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-[#191970]/10 to-[#4A0072]/10 border border-[#191970]/20 text-neutral-700 rounded-xl text-sm font-medium"
-                              >
-                                {email}
+                      <motion.span
+                        key={email}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-[#191970]/10 to-[#4A0072]/10 border border-[#191970]/20 text-neutral-700 rounded-xl text-sm font-medium"
+                      >
+                        {email}
                                 <span className="text-xs px-1.5 py-0.5 bg-[#191970]/20 text-[#191970] rounded-full font-medium">
                                   Del equipo
                                 </span>
@@ -543,16 +543,16 @@ export function ReportSettingsForm({ organizationId, existingSettings, onCancel 
                                 <span className="text-xs px-1.5 py-0.5 bg-[#C2185B]/20 text-[#C2185B] rounded-full font-medium">
                                   Externo
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => removeEmailRecipient(email)}
-                                  className="text-neutral-400 hover:text-red-500 transition-colors"
+                        <button
+                          type="button"
+                          onClick={() => removeEmailRecipient(email)}
+                          className="text-neutral-400 hover:text-red-500 transition-colors"
                                   title="Quitar de destinatarios"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </motion.span>
-                            ))}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </motion.span>
+                    ))}
                         </div>
                       </div>
                     )}

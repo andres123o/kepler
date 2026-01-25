@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { fetchCompanyContext } from '@/app/actions/fetch-company-context'
 
 // Función helper para obtener la URL base correcta
 function getBaseUrl(requestUrl: URL): string {
@@ -66,9 +67,11 @@ export async function GET(request: Request) {
       // Verificar si ya tiene organización
       const { data: existingOrg } = await supabase
         .from('organizations')
-        .select('id')
+        .select('id, name')
         .eq('owner_id', data.user.id)
         .single()
+
+      let organization = existingOrg as any
 
       if (!existingOrg) {
         // Crear organización con el plan seleccionado
@@ -76,17 +79,42 @@ export async function GET(request: Request) {
           ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
           : null
 
+        const orgName = `${data.user.user_metadata?.full_name || data.user.user_metadata?.name || 'Usuario'}'s Organization`
+
         // @ts-ignore - Supabase types issue
-        await supabase
+        const { data: newOrg, error: orgError } = await supabase
           .from('organizations')
           .insert({
-            name: `${data.user.user_metadata?.full_name || data.user.user_metadata?.name || 'Usuario'}'s Organization`,
+            name: orgName,
             slug: `${data.user.id}-${Date.now()}`,
             owner_id: data.user.id,
             plan: plan as 'hobby' | 'startup' | 'growth',
             trial_ends_at: trialEndsAt,
             subscription_status: plan === 'hobby' ? 'trial' : 'active',
           } as any)
+          .select('id, name')
+          .single()
+
+        if (!orgError && newOrg) {
+          organization = newOrg as any
+
+          // Ejecutar scraping de contexto de empresa en background (no bloquea)
+          // Intentar extraer nombre de empresa del nombre de la organización
+          const companyName = orgName.replace("'s Organization", "").trim()
+          if (companyName && companyName !== 'Usuario' && organization?.id) {
+            fetchCompanyContext(organization.id, companyName, data.user.id)
+              .then((result) => {
+                if (result.success) {
+                  console.log(`✅ Contexto de empresa guardado desde callback: ${result.saved} registros`)
+                } else {
+                  console.error(`⚠️ Error al obtener contexto desde callback: ${result.error}`)
+                }
+              })
+              .catch((error) => {
+                console.error('⚠️ Error al ejecutar fetchCompanyContext desde callback:', error)
+              })
+          }
+        }
       }
     }
 
