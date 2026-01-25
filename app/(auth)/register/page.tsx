@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, Check, Instagram, Smartphone, Building2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { fetchCompanyContext } from "@/app/actions/fetch-company-context";
-import { generateFirstAnalysis } from "@/app/actions/generate-first-analysis";
+import { createOrganizationImmediate } from "@/app/actions/create-organization-immediate";
 
 function RegisterForm() {
   const router = useRouter();
@@ -129,17 +128,12 @@ function RegisterForm() {
       }
 
       // 1. Crear usuario en Supabase Auth
-      // Guardar datos del formulario en user_metadata para que estén disponibles después de confirmar email
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
-            company_name: companyName.trim(),
-            instagram_username: instagramUsername.trim(),
-            playstore_url: playStoreUrl.trim(),
-            registration_plan: selectedPlan,
           },
           emailRedirectTo: `${baseUrl}/auth/callback?plan=${selectedPlan}`,
         },
@@ -154,8 +148,26 @@ function RegisterForm() {
       // 2. Verificar si necesita confirmar email
       if (authData.user && !authData.session) {
         // Email confirmation está habilitado
-        // El perfil se crea automáticamente por el trigger
-        // La organización se creará cuando confirme el email (en el callback o al iniciar sesión)
+        // Crear organización y data sources inmediatamente (no esperar confirmación)
+        // El scraping y análisis se ejecutarán en background
+        createOrganizationImmediate(
+          authData.user.id,
+          companyName.trim(),
+          instagramUsername.trim() || undefined,
+          playStoreUrl.trim() || undefined,
+          selectedPlan
+        )
+          .then((result) => {
+            if (result.success) {
+              console.log(`✅ Organización creada inmediatamente: ${result.organizationId}`)
+            } else {
+              console.error(`⚠️ Error al crear organización: ${result.error}`)
+            }
+          })
+          .catch((error) => {
+            console.error('⚠️ Error al ejecutar createOrganizationImmediate:', error)
+          })
+
         setError("");
         setIsLoading(false);
         alert("¡Registro exitoso! Por favor, revisa tu correo y haz clic en el enlace de confirmación para activar tu cuenta. Luego podrás iniciar sesión.");
@@ -163,108 +175,26 @@ function RegisterForm() {
         return;
       }
 
-      // 3. Si tiene sesión activa (sin confirmación de email), crear organización
+      // 3. Si tiene sesión activa (sin confirmación de email), crear organización inmediatamente
       if (authData.session && authData.user) {
-        // El perfil ya fue creado por el trigger con el full_name del metadata
-        // No necesitamos actualizarlo manualmente
-
-        // Usar nombre de empresa si está disponible, sino usar el nombre completo
-        const orgName = companyName.trim() || (fullName ? `${fullName}'s Organization` : "Mi Organización");
-        
-        // Crear organización con el plan seleccionado
-        const trialEndsAt = selectedPlan === "hobby" 
-          ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-          : null;
-
-        const { data: organization, error: orgError } = await supabase
-          .from("organizations")
-          // @ts-ignore - Supabase client types issue in client components
-          .insert({
-            name: orgName,
-            slug: `${authData.user.id}-${Date.now()}`,
-            owner_id: authData.user.id,
-            plan: selectedPlan as "hobby" | "startup" | "growth",
-            trial_ends_at: trialEndsAt,
-            subscription_status: selectedPlan === "hobby" ? "trial" : "active",
-          } as any)
-          .select()
-          .single();
-
-        if (orgError) {
-          // Si la org ya existe, no es problema (puede pasar si se registra dos veces)
-          if (!orgError.message.includes("duplicate") && !orgError.message.includes("unique")) {
-            throw orgError;
-          }
-        }
-
-        // Verificar que organization existe y tiene id
-        const org = organization as any;
-        if (!org || !org.id) {
-          throw new Error("No se pudo crear la organización");
-        }
-
-        // 4. Crear data_sources si se proporcionaron datos (necesario antes de generar análisis)
-        if ((instagramUsername.trim() || playStoreUrl.trim())) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const dataSourcesToCreate: any[] = [];
-            
-            // Instagram data source
-            if (instagramUsername.trim()) {
-              const cleanInstagram = instagramUsername.trim().replace(/^@/, '').replace(/\s+/g, '');
-              dataSourcesToCreate.push({
-                organization_id: org.id,
-                source_type: 'social',
-                source_name: 'Instagram',
-                social_platform: 'instagram',
-                social_username: cleanInstagram,
-                uploaded_by: user.id,
-              });
+        // Crear organización y data sources inmediatamente (mismo flujo que sin sesión)
+        createOrganizationImmediate(
+          authData.user.id,
+          companyName.trim(),
+          instagramUsername.trim() || undefined,
+          playStoreUrl.trim() || undefined,
+          selectedPlan
+        )
+          .then((result) => {
+            if (result.success) {
+              console.log(`✅ Organización creada inmediatamente: ${result.organizationId}`)
+            } else {
+              console.error(`⚠️ Error al crear organización: ${result.error}`)
             }
-            
-            // Play Store data source
-            if (playStoreUrl.trim()) {
-              dataSourcesToCreate.push({
-                organization_id: org.id,
-                source_type: 'app_store',
-                source_name: 'Play Store',
-                app_store_type: 'play_store',
-                app_url: playStoreUrl.trim(),
-                uploaded_by: user.id,
-              });
-            }
-            
-            // Insertar data sources
-            if (dataSourcesToCreate.length > 0) {
-              await supabase
-                .from("data_sources")
-                // @ts-ignore
-                .insert(dataSourcesToCreate as any);
-            }
-          }
-        }
-
-        // 5. Ejecutar generación de primer análisis en background (no bloquea)
-        // Esto ejecuta: scraping de contexto empresa + Instagram + Play Store + análisis automático
-        if (companyName.trim()) {
-          generateFirstAnalysis(
-            org.id,
-            companyName.trim(),
-            authData.user.id,
-            instagramUsername.trim() || undefined,
-            playStoreUrl.trim() || undefined
-          )
-            .then((result) => {
-              if (result.success) {
-                console.log(`✅ Primer análisis generado exitosamente: ${result.insightId}`);
-              } else {
-                console.error(`⚠️ Error al generar primer análisis: ${result.error}`);
-              }
-            })
-            .catch((error) => {
-              console.error('⚠️ Error al ejecutar generateFirstAnalysis:', error);
-            });
-        }
+          })
+          .catch((error) => {
+            console.error('⚠️ Error al ejecutar createOrganizationImmediate:', error)
+          })
 
         // Redirigir al dashboard
         router.push("/dashboard");
