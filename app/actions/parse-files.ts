@@ -6,7 +6,7 @@
 
 'use server'
 
-import { NPSSurvey, CSATSurvey, Ticket } from '@/app/agents/kepler/types';
+import { NPSSurvey, Ticket } from '@/lib/types/analysis';
 
 /**
  * Parsea un archivo CSV simple
@@ -102,61 +102,6 @@ export async function parseNPSFile(file: File, sourceId: string): Promise<NPSSur
   } catch (error: any) {
     console.error('Error parseando archivo NPS:', error);
     throw new Error(`Error parseando archivo NPS: ${error.message}`);
-  }
-}
-
-/**
- * Parsea un archivo CSAT desde un File object
- */
-export async function parseCSATFile(file: File, sourceId: string): Promise<CSATSurvey[]> {
-  try {
-    const text = await fileToText(file);
-    const surveys: CSATSurvey[] = [];
-    const fileType = file.name.split('.').pop()?.toLowerCase() || '';
-    
-    if (fileType === 'csv' || fileType === 'txt') {
-      const rows = parseCSV(text);
-      
-      rows.forEach((row, idx) => {
-        const score = parseInt(row.score || row.csat || row.rating || '0');
-        const comment = row.comment || row.comentario || row.feedback || row.text || '';
-        const timestamp = row.timestamp || row.date || row.fecha || new Date().toISOString();
-        
-        if (score >= 0 && score <= 5) {
-          surveys.push({
-            id: `${sourceId}-csat-${idx}`,
-            score,
-            comment: comment || undefined,
-            timestamp,
-            source: 'file',
-          });
-        }
-      });
-    } else if (fileType === 'json') {
-      const data = JSON.parse(text);
-      const items = Array.isArray(data) ? data : [data];
-      
-      items.forEach((item: any, idx: number) => {
-        const score = parseInt(item.score || item.csat || item.rating || '0');
-        const comment = item.comment || item.comentario || item.feedback || item.text || '';
-        const timestamp = item.timestamp || item.date || item.fecha || new Date().toISOString();
-        
-        if (score >= 0 && score <= 5) {
-          surveys.push({
-            id: `${sourceId}-csat-${idx}`,
-            score,
-            comment: comment || undefined,
-            timestamp,
-            source: 'file',
-          });
-        }
-      });
-    }
-    
-    return surveys;
-  } catch (error: any) {
-    console.error('Error parseando archivo CSAT:', error);
-    throw new Error(`Error parseando archivo CSAT: ${error.message}`);
   }
 }
 

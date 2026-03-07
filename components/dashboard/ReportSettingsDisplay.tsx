@@ -2,14 +2,18 @@
 
 import { Edit2, CheckCircle2, Clock, Mail, MessageSquare, Webhook, Settings, Zap, Shield, Bell, X } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
 import { ReportSettingsForm } from "./ReportSettingsForm";
 
 interface ReportSettingsDisplayProps {
   settings: any;
   organizationId: string;
   showEditButtonInHeader?: boolean;
+  /** Contador de insights (desde backend). Por defecto 0 hasta conectar API */
+  insightsCount?: number | null;
+  /** Emails del equipo y destinatarios (desde backend). Por defecto [] hasta conectar API */
+  teamEmails?: string[];
+  allRecipients?: string[];
 }
 
 const frequencyLabels: Record<string, string> = {
@@ -47,70 +51,19 @@ const getPriorityBadgeColor = (priority: string) => {
   }
 };
 
-export function ReportSettingsDisplay({ settings, organizationId, showEditButtonInHeader = false }: ReportSettingsDisplayProps) {
+export function ReportSettingsDisplay({
+  settings,
+  organizationId,
+  showEditButtonInHeader = false,
+  insightsCount: insightsCountProp = null,
+  teamEmails: teamEmailsProp = [],
+  allRecipients: allRecipientsProp = [],
+}: ReportSettingsDisplayProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [teamEmails, setTeamEmails] = useState<string[]>([]);
-  const [allRecipients, setAllRecipients] = useState<string[]>([]);
   const [showEmailsModal, setShowEmailsModal] = useState(false);
-  const [insightsCount, setInsightsCount] = useState<number | null>(null);
-  const supabase = createClient();
-
-  // Cargar contador de insights
-  useEffect(() => {
-    const loadInsightsCount = async () => {
-      const { count, error } = await supabase
-        .from('insights')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId);
-      
-      if (!error && count !== null) {
-        setInsightsCount(count);
-      }
-    };
-    
-    loadInsightsCount();
-  }, [organizationId, supabase]);
-
-  // Cargar emails del equipo y hacer merge con los guardados
-  useEffect(() => {
-    const loadTeamEmails = async () => {
-      const { data: teamContexts, error } = await supabase
-        .from('team_context')
-        .select('email')
-        .eq('organization_id', organizationId);
-      
-      if (!error && teamContexts) {
-        const emails = (teamContexts as any[])
-          .map((tc: any) => ({
-            original: tc.email,
-            normalized: tc.email?.trim().toLowerCase()
-          }))
-          .filter(({ normalized }) => !!normalized && normalized.length > 0 && normalized.includes('@'))
-          .map(({ normalized }) => normalized as string);
-        
-        setTeamEmails(emails);
-        
-        // Hacer merge: emails del equipo + emails externos guardados
-        const savedRecipients = settings?.email_recipients || [];
-        const merged = new Set<string>();
-        
-        // 1. Agregar todos los emails del equipo
-        emails.forEach(email => merged.add(email));
-        
-        // 2. Agregar emails guardados que NO sean del equipo (externos)
-        savedRecipients.forEach((email: string) => {
-          const emailLower = email.toLowerCase();
-          if (!emails.includes(emailLower)) {
-            merged.add(email); // Mantener formato original
-          }
-        });
-        
-        setAllRecipients(Array.from(merged));
-      }
-    };
-    
-    loadTeamEmails();
-  }, [organizationId, settings?.email_recipients, supabase]);
+  const insightsCount = insightsCountProp;
+  const teamEmails = teamEmailsProp;
+  const allRecipients = allRecipientsProp.length > 0 ? allRecipientsProp : (settings?.email_recipients || []);
 
   // Helper para determinar si un email es del equipo
   const isTeamEmail = (email: string): boolean => {
@@ -118,7 +71,14 @@ export function ReportSettingsDisplay({ settings, organizationId, showEditButton
   };
 
   if (isEditing) {
-    return <ReportSettingsForm organizationId={organizationId} existingSettings={settings} onCancel={() => setIsEditing(false)} />;
+    return (
+      <ReportSettingsForm
+        organizationId={organizationId}
+        existingSettings={settings}
+        onCancel={() => setIsEditing(false)}
+        teamEmails={teamEmails}
+      />
+    );
   }
 
   // Contar canales activos

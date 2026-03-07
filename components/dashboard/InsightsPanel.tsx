@@ -1,37 +1,19 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Target, Users, TrendingDown, Calendar, Loader2, AlertCircle, Eye, X, Instagram, Linkedin, Smartphone, FileText, MessageSquare, Star } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 
 interface InsightsPanelProps {
   organizationId: string;
+  /** Insights se cargarán vía API del backend; pasar lista desde el padre cuando esté conectado */
+  insights?: any[];
+  loading?: boolean;
 }
 
-export function InsightsPanel({ organizationId }: InsightsPanelProps) {
-  const [insights, setInsights] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export function InsightsPanel({ organizationId, insights = [], loading = false }: InsightsPanelProps) {
   const [selectedInsight, setSelectedInsight] = useState<any | null>(null);
-
-  useEffect(() => {
-    async function fetchInsights() {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('insights')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('generated_at', { ascending: false });
-      
-      if (!error && data) {
-        setInsights(data);
-      }
-      setLoading(false);
-    }
-    
-    fetchInsights();
-  }, [organizationId]);
 
   if (loading) {
     return (
@@ -71,7 +53,7 @@ export function InsightsPanel({ organizationId }: InsightsPanelProps) {
           <AlertCircle className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
           <p className="text-neutral-500 text-lg mb-2">No hay insights aún</p>
           <p className="text-neutral-400 text-sm">
-            Inicia tu primer análisis desde el dashboard principal
+            Inicia un análisis desde el dashboard principal
           </p>
         </div>
       </div>

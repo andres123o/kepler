@@ -2,21 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Plus, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useDashboard } from "./DashboardContext";
+
+export type TeamMemberFormPayload = {
+  organization_id: string;
+  email: string;
+  full_name: string;
+  role: "admin" | "member";
+};
 
 interface TeamMemberFormProps {
   organizationId: string;
   onCancel?: () => void;
   showFormOnly?: boolean;
+  /** Conectar al backend: POST /api/organization-members (o equivalente) */
+  onSave?: (payload: TeamMemberFormPayload) => Promise<void>;
 }
 
-export function TeamMemberForm({ organizationId, onCancel, showFormOnly = false }: TeamMemberFormProps) {
+export function TeamMemberForm({ organizationId, onCancel, showFormOnly = false, onSave }: TeamMemberFormProps) {
   const router = useRouter();
-  const supabase = createClient();
-  const { setActivePanel } = useDashboard();
   const [isOpen, setIsOpen] = useState(showFormOnly || !!onCancel);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -32,110 +37,20 @@ export function TeamMemberForm({ organizationId, onCancel, showFormOnly = false 
     setIsLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const payload: TeamMemberFormPayload = {
+        organization_id: organizationId,
+        email: formData.email.trim().toLowerCase(),
+        full_name: formData.full_name.trim(),
+        role: formData.role,
+      };
 
-      if (!user) {
-        throw new Error("No estás autenticado");
+      if (onSave) {
+        await onSave(payload);
       }
 
-      // Buscar el perfil del usuario por email
-      // Nota: Solo podemos agregar usuarios que ya tienen cuenta en el sistema
-      // En producción, esto debería enviar una invitación por email
-      const { data: existingProfile, error: profileError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("email", formData.email.trim().toLowerCase())
-        .maybeSingle();
-
-      if (profileError) {
-        throw profileError;
-      }
-
-      if (!existingProfile) {
-        throw new Error("Este usuario no tiene una cuenta en el sistema. Por favor, pídele que se registre primero o envía una invitación.");
-      }
-
-      const profileId = (existingProfile as any).id;
-
-      // Verificar si el miembro ya existe en la organización
-      const { data: existingMember } = await supabase
-        .from("organization_members")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .eq("user_id", profileId)
-        .single();
-
-      if (existingMember) {
-        throw new Error("Este usuario ya es miembro de la organización");
-      }
-
-      // Insertar miembro en la organización
-      const { error: insertError } = await supabase
-        .from("organization_members")
-        // @ts-ignore - Supabase client types issue with generic table
-        .insert({
-          organization_id: organizationId,
-          user_id: profileId,
-          role: formData.role,
-        });
-
-      if (insertError) {
-        throw insertError;
-      }
-
-      // Verificar si es el primer miembro para marcar el paso 2 como completado
-      const { data: existingMembers } = await supabase
-        .from("organization_members")
-        .select("id")
-        .eq("organization_id", organizationId);
-
-      if (existingMembers && existingMembers.length === 1) {
-        // Es el primer miembro, marcar paso 2 como completado
-        const { data: existingProgress } = await supabase
-          .from("onboarding_progress")
-          .select("id")
-          .eq("organization_id", organizationId)
-          .maybeSingle();
-
-        if (existingProgress) {
-          // Actualizar progreso existente
-          await supabase
-            .from("onboarding_progress")
-            // @ts-ignore - Supabase client types issue with generic table
-            .update({
-              step_2_completed: true,
-              step_2_completed_at: new Date().toISOString(),
-            })
-            .eq("organization_id", organizationId);
-        } else {
-          // Crear registro de progreso
-          await supabase
-            .from("onboarding_progress")
-            // @ts-ignore - Supabase client types issue with generic table
-            .insert({
-              organization_id: organizationId,
-              step_2_completed: true,
-              step_2_completed_at: new Date().toISOString(),
-            });
-        }
-      }
-
-      // Limpiar formulario y cerrar
       setFormData({ email: "", full_name: "", role: "member" });
       setIsOpen(false);
-      
-      // Si es el primer miembro, cambiar al panel dashboard y refrescar
-      if (existingMembers && existingMembers.length === 1) {
-        setActivePanel('dashboard');
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
-      } else {
-        router.refresh();
-        window.location.reload();
-      }
+      router.refresh();
     } catch (err: any) {
       setError(err.message || "Error al guardar el miembro");
     } finally {

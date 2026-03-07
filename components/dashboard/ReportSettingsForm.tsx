@@ -2,24 +2,24 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Loader2, Plus, X, Settings, Mail, Webhook } from "lucide-react";
 import { motion } from "framer-motion";
-import { useDashboard } from "./DashboardContext";
 
 interface ReportSettingsFormProps {
   organizationId: string;
   existingSettings?: any;
   onCancel?: () => void;
+  /** Emails del equipo (desde backend). Por defecto vacío hasta conectar API */
+  teamEmails?: string[];
+  /** Conectar al backend: PUT /api/report-settings (o equivalente) */
+  onSave?: (payload: Record<string, unknown>) => Promise<void>;
 }
 
-export function ReportSettingsForm({ organizationId, existingSettings, onCancel }: ReportSettingsFormProps) {
+export function ReportSettingsForm({ organizationId, existingSettings, onCancel, teamEmails: teamEmailsProp = [], onSave }: ReportSettingsFormProps) {
   const router = useRouter();
-  const supabase = createClient();
-  const { setActivePanel } = useDashboard();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [teamEmails, setTeamEmails] = useState<string[]>([]); // Emails del equipo desde team_context
+  const [teamEmails, setTeamEmails] = useState<string[]>(teamEmailsProp);
   
   const [formData, setFormData] = useState({
     // Platform (siempre habilitado)
@@ -49,10 +49,12 @@ export function ReportSettingsForm({ organizationId, existingSettings, onCancel 
     categories_filter: [] as string[],
   });
 
-  // Cargar datos existentes primero (sin email_recipients - se maneja en el otro useEffect)
+  useEffect(() => {
+    setTeamEmails(teamEmailsProp);
+  }, [teamEmailsProp]);
+
   useEffect(() => {
     if (existingSettings) {
-      console.log('[ReportSettingsForm] Cargando existingSettings:', existingSettings);
       setFormData(prev => ({
         ...prev,
         platform_frequency: existingSettings.platform_frequency || "realtime",
@@ -75,99 +77,16 @@ export function ReportSettingsForm({ organizationId, existingSettings, onCancel 
     }
   }, [existingSettings]);
 
-  // Cargar emails del equipo desde team_context y hacer merge con existingSettings
   useEffect(() => {
-    const loadTeamEmails = async () => {
-      // Consultar TODOS los team_contexts (sin filtrar por email null)
-      const { data: teamContexts, error } = await supabase
-        .from('team_context')
-        .select('email')
-        .eq('organization_id', organizationId);
-      
-      console.log('[ReportSettingsForm] Team contexts loaded:', teamContexts);
-      console.log('[ReportSettingsForm] Error:', error);
-      
-      if (!error && teamContexts) {
-        // Filtrar emails válidos (no null, no vacíos, con formato válido)
-        const emails = (teamContexts as any[])
-          .map((tc: any) => ({
-            original: tc.email,
-            normalized: tc.email?.trim().toLowerCase()
-          }))
-          .filter(({ original, normalized }) => {
-            const isValid = !!normalized && normalized.length > 0 && normalized.includes('@');
-            if (!isValid && original) {
-              console.log('[ReportSettingsForm] Email inválido filtrado:', original);
-            }
-            return isValid;
-          })
-          .map(({ normalized }) => normalized as string);
-        
-        console.log('[ReportSettingsForm] Emails válidos del equipo:', emails);
-        console.log('[ReportSettingsForm] Total emails encontrados:', emails.length);
-        
-        setTeamEmails(emails);
-        
-        // Hacer merge inteligente: emails del equipo + emails externos guardados
-        setFormData(prev => {
-          const savedRecipients = existingSettings?.email_recipients || [];
-          const allRecipients = new Set<string>();
-          
-          // 1. Agregar todos los emails del equipo (SIEMPRE, automáticamente)
-          emails.forEach(email => {
-            allRecipients.add(email);
-            console.log('[ReportSettingsForm] Agregando email del equipo:', email);
-          });
-          
-          // 2. Agregar emails guardados que NO sean del equipo (son externos)
-          savedRecipients.forEach((email: string) => {
-            const emailLower = email.toLowerCase();
-            if (!emails.includes(emailLower)) {
-              allRecipients.add(email); // Mantener formato original
-              console.log('[ReportSettingsForm] Agregando email externo guardado:', email);
-            } else {
-              console.log('[ReportSettingsForm] Email guardado ya está en equipo, omitiendo:', email);
-            }
-          });
-          
-          const finalRecipients = Array.from(allRecipients);
-          console.log('[ReportSettingsForm] Total destinatarios finales:', finalRecipients.length);
-          console.log('[ReportSettingsForm] Destinatarios finales:', finalRecipients);
-          
-          return {
-            ...prev,
-            email_recipients: finalRecipients,
-          };
-        });
-      } else if (error) {
-        console.error('[ReportSettingsForm] Error cargando team_context:', error);
-      }
-    };
-    
-    loadTeamEmails();
-    
-    // Escuchar cambios en team_context para sincronización en tiempo real
-    const channel = supabase
-      .channel('team-context-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'team_context',
-          filter: `organization_id=eq.${organizationId}`,
-        },
-        () => {
-          // Recargar emails del equipo cuando haya cambios (agregar/eliminar miembro)
-          loadTeamEmails();
-        }
-      )
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [organizationId, supabase, existingSettings]);
+    const savedRecipients = existingSettings?.email_recipients || [];
+    const allRecipients = new Set<string>();
+    teamEmails.forEach((e: string) => allRecipients.add(e));
+    savedRecipients.forEach((email: string) => {
+      const emailLower = email.toLowerCase();
+      if (!teamEmails.includes(emailLower)) allRecipients.add(email);
+    });
+    setFormData(prev => ({ ...prev, email_recipients: Array.from(allRecipients) }));
+  }, [teamEmails, existingSettings?.email_recipients]);
 
   const addEmailRecipient = () => {
     const email = formData.email_recipient_input.trim();
@@ -255,14 +174,6 @@ export function ReportSettingsForm({ organizationId, existingSettings, onCancel 
     setIsLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        throw new Error("No estás autenticado");
-      }
-
       // Construir array de canales activos
       const deliveryChannels: string[] = ["platform"];
       // Slack deshabilitado por ahora (próximamente)
@@ -313,63 +224,10 @@ export function ReportSettingsForm({ organizationId, existingSettings, onCancel 
         insertData.webhook_events = formData.webhook_events.length > 0 ? formData.webhook_events : null;
       }
 
-      // Insertar o actualizar
-      if (existingSettings && existingSettings.id) {
-        const { error: updateError } = await supabase
-          .from("report_settings")
-          // @ts-ignore - Supabase client types issue with generic table
-          .update(insertData)
-          .eq("organization_id", organizationId);
+      if (existingSettings?.id) insertData.id = existingSettings.id;
+      if (onSave) await onSave(insertData);
 
-        if (updateError) throw updateError;
-        console.log('[ReportSettingsForm] Updated existing settings');
-      } else {
-        const { data: insertedData, error: insertError } = await supabase
-          .from("report_settings")
-          // @ts-ignore - Supabase client types issue with generic table
-          .insert(insertData)
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-        console.log('[ReportSettingsForm] Inserted new settings:', insertedData);
-      }
-
-      // Marcar el paso 4 como completado (tanto si es insert como update)
-      const { data: existingProgress } = await supabase
-        .from("onboarding_progress")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .maybeSingle();
-
-      if (existingProgress) {
-        await supabase
-          .from("onboarding_progress")
-          // @ts-ignore - Supabase client types issue with generic table
-          .update({
-            step_4_completed: true,
-            step_4_completed_at: new Date().toISOString(),
-          })
-          .eq("organization_id", organizationId);
-      } else {
-        await supabase
-          .from("onboarding_progress")
-          // @ts-ignore - Supabase client types issue with generic table
-          .insert({
-            organization_id: organizationId,
-            step_4_completed: true,
-            step_4_completed_at: new Date().toISOString(),
-          });
-      }
-
-      // Refrescar y redirigir al dashboard
       router.refresh();
-      setActivePanel('dashboard');
-      
-      // Recargar la página para actualizar el estado
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
     } catch (err: any) {
       setError(err.message || "Error al guardar la configuración");
     } finally {

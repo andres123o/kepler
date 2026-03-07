@@ -1,35 +1,44 @@
 "use client";
 
-import { useState, useTransition, useMemo, useEffect } from "react";
+import { useState, useTransition, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { FileText, Sparkles, Loader2, Instagram, Linkedin, Smartphone, Database, MessageSquare, Info, CheckCircle2, X, Upload, Link2, Target, Users, TrendingDown, Calendar, Clock, ChevronRight, Mail, Send, Star, Eye, Brain, Zap, BarChart3, Search, FileSearch, Lightbulb } from "lucide-react";
+import { FileText, Sparkles, Loader2, Instagram, Linkedin, Smartphone, Database, MessageSquare, CheckCircle2, X, Upload, Link2, Target, Users, Calendar, ChevronRight, Send, Star, Eye, Brain, Zap, BarChart3, Search, FileSearch, Lightbulb } from "lucide-react";
 import { FileUploadModal } from "./FileUploadModal";
 import { useDashboard } from "./DashboardContext";
 import { runCompleteAnalysis } from "@/app/actions/run-analysis";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 import { sendInsightByEmail } from "@/app/actions/send-insight-email";
-import { createClient } from "@/lib/supabase/client";
 
 interface DashboardContentProps {
+  profile?: any;
   organization: any;
   insights?: any[];
   dataSources?: any[];
   businessContexts?: any[];
+  teamContexts?: any[];
+  organizationMembers?: any[];
 }
 
-// Mensajes dinámicos para el loader
+// Referencias de "subiré archivo cuando genere el análisis" → no bloquean el reporte
+const DEFERRED_UPLOAD_REFERENCES = [
+  "Se subirá archivo cuando se genere el análisis",
+  "Usuario importará data desde un archivo después",
+  "Usuario importará data interna desde un archivo después",
+];
+
+// Mensajes dinámicos para el loader - Específicos del proceso real
 const analysisMessages = [
-  { icon: Search, text: "Recopilando datos de tus fuentes...", subtext: "Conectando con Instagram, Play Store y más" },
-  { icon: FileSearch, text: "Procesando archivos y feedback...", subtext: "Analizando tickets, NPS y encuestas CSAT" },
-  { icon: Brain, text: "Aplicando inteligencia artificial...", subtext: "Identificando patrones y tendencias" },
-  { icon: BarChart3, text: "Detectando clusters de problemas...", subtext: "Agrupando feedback similar" },
-  { icon: Zap, text: "Priorizando hallazgos críticos...", subtext: "Calculando impacto en el negocio" },
-  { icon: Lightbulb, text: "Generando recomendaciones...", subtext: "Creando plan de acción personalizado" },
+  { icon: Search, text: "Procesando datos...", subtext: "Obteniendo información de tu sitio web" },
+  { icon: Brain, text: "Investigando empresa...", subtext: "Analizando misión, visión y objetivos" },
+  { icon: FileSearch, text: "Reporte de usuarios en la web...", subtext: "Recopilando feedback de Instagram y Play Store" },
+  { icon: BarChart3, text: "Analizando patrones...", subtext: "Identificando tendencias y problemas comunes" },
+  { icon: Zap, text: "Generando insights...", subtext: "Creando recomendaciones personalizadas" },
+  { icon: Lightbulb, text: "¡Casi listo!", subtext: "Finalizando tu primer reporte" },
 ];
 
 // Componente de Loader Mejorado
-function AnalysisLoader({ isVisible }: { isVisible: boolean }) {
+function AnalysisLoader({ isVisible, onCancel }: { isVisible: boolean; onCancel?: () => void }) {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
 
@@ -40,20 +49,20 @@ function AnalysisLoader({ isVisible }: { isVisible: boolean }) {
       return;
     }
 
-    // Cambiar mensaje cada 4 segundos
+    // Cambiar mensaje cada 3 segundos (más dinámico)
     const messageInterval = setInterval(() => {
       setCurrentMessageIndex((prev) => (prev + 1) % analysisMessages.length);
-    }, 4000);
+    }, 3000);
 
-    // Simular progreso suave
+    // Simular progreso suave (más rápido al inicio para dar sensación de avance)
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 95) return prev;
+        if (prev >= 90) return prev; // Máximo 90% hasta que realmente termine
         // Progreso más rápido al inicio, más lento al final
-        const increment = prev < 30 ? 3 : prev < 60 ? 2 : prev < 80 ? 1 : 0.5;
-        return Math.min(prev + increment, 95);
+        const increment = prev < 40 ? 4 : prev < 70 ? 2.5 : prev < 85 ? 1.5 : 0.8;
+        return Math.min(prev + increment, 90);
       });
-    }, 500);
+    }, 400);
 
     return () => {
       clearInterval(messageInterval);
@@ -74,6 +83,21 @@ function AnalysisLoader({ isVisible }: { isVisible: boolean }) {
     >
       {/* Backdrop con blur */}
       <div className="absolute inset-0 bg-white/80 backdrop-blur-md" />
+
+      {/* Botón X en esquina para cancelar */}
+      {onCancel && (
+        <motion.button
+          type="button"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.15 }}
+          onClick={onCancel}
+          className="absolute top-4 right-4 z-20 p-2 rounded-full bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 text-neutral-600 hover:text-neutral-900 transition-colors shadow-sm"
+          aria-label="Cancelar análisis"
+        >
+          <X className="w-5 h-5" />
+        </motion.button>
+      )}
 
       {/* Contenido principal */}
       <motion.div
@@ -239,7 +263,7 @@ function AnalysisLoader({ isVisible }: { isVisible: boolean }) {
           ))}
         </div>
 
-        {/* Mensaje de calma */}
+        {/* Mensaje de calma - Más positivo y dinámico */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -249,24 +273,22 @@ function AnalysisLoader({ isVisible }: { isVisible: boolean }) {
             fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
           }}
         >
-          Esto puede tomar entre 30 segundos y 2 minutos dependiendo de la cantidad de datos. No cierres esta ventana.
+          Estamos trabajando en tu análisis. Esto tomará solo unos momentos...
         </motion.p>
       </motion.div>
     </motion.div>
   );
 }
 
-export function DashboardContent({ organization, insights = [], dataSources = [], businessContexts = [] }: DashboardContentProps) {
+export function DashboardContent({ profile, organization, insights = [], dataSources = [], businessContexts = [], teamContexts = [], organizationMembers = [] }: DashboardContentProps) {
   const [isPending, startTransition] = useTransition();
+  const analyzingRef = useRef(false); // Evita doble envío (doble clic o Strict Mode)
   const [status, setStatus] = useState<string>("");
   const [showFileUploadModal, setShowFileUploadModal] = useState(false);
   const [showAllSourcesModal, setShowAllSourcesModal] = useState(false);
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
-  const [isFirstLogin, setIsFirstLogin] = useState(false);
-  const [isProcessingFirstAnalysis, setIsProcessingFirstAnalysis] = useState(false);
   const { setActivePanel } = useDashboard();
   const router = useRouter();
-  const supabase = createClient();
 
   // Filtrar fuentes de redes sociales
   const instagramSources = dataSources.filter(
@@ -281,85 +303,53 @@ export function DashboardContent({ organization, insights = [], dataSources = []
     (source) => source.source_type === "app_store" && source.app_store_type === "play_store"
   );
 
-  // Fuentes que requieren archivos (NPS, CSAT, Tickets con método file)
+  // Fuentes que requieren archivos (NPS, Tickets, Data Interna con método file)
   const fileSources = dataSources.filter(
-    (source) => 
-      source.source_type === "nps" || 
-      source.source_type === "csat" || 
-      (source.source_type === "tickets" && (source.tickets_method === "file" || source.import_method_reference?.includes("archivo")))
+    (source: any) =>
+      source.source_type === "nps" ||
+      (source.source_type === "tickets" && (source.tickets_method === "file" || source.import_method_reference?.includes("archivo"))) ||
+      (source.source_type === "internal_data" && (source.internal_data_method === "file" || source.import_method_reference?.includes("archivo")))
   );
 
-  // Fuentes que requieren archivos pero no los tienen
+  // Fuentes que requieren archivos pero no los tienen (las configuradas como "subiré cuando genere el análisis" no bloquean)
   const missingFileSources = useMemo(() => {
     return fileSources
-      .filter((source) => !source.file_path || !source.file_name)
-      .map((source) => ({
+      .filter((source: any) => {
+        const hasFile = !!(source.file_path && source.file_name);
+        if (hasFile) return false;
+        const isDeferredUpload = DEFERRED_UPLOAD_REFERENCES.some(
+          (ref) => source.import_method_reference === ref
+        );
+        return !isDeferredUpload;
+      })
+      .map((source: any) => ({
         id: source.id,
-        sourceName: source.source_name || (source.source_type === "nps" ? "NPS" : source.source_type === "csat" ? "CSAT" : "Tickets"),
+        sourceName: source.source_name || (source.source_type === "nps" ? "NPS" : source.source_type === "internal_data" ? "Data Interna" : "Tickets"),
         sourceType: source.source_type,
         sourceId: source.id,
       }));
   }, [fileSources]);
-  
+
+  // Lista de fuentes que usan archivo (para pedir subida en "Nuevo análisis") — desde la tabla data_sources
+  const fileSourcesForUpload = useMemo(() => {
+    return fileSources.map((source: any) => ({
+      id: source.id,
+      sourceName: source.source_name || (source.source_type === "nps" ? "NPS" : source.source_type === "internal_data" ? "Data Interna" : "Tickets"),
+      sourceType: source.source_type,
+      sourceId: source.id,
+    }));
+  }, [fileSources]);
+
   const hasSocialSources = instagramSources.length > 0 || linkedInSources.length > 0 || playStoreSources.length > 0;
   const hasDataSources = dataSources.length > 0;
 
-  // Detectar si es primer login (no hay insights y hay data sources)
-  useEffect(() => {
-    if (insights.length === 0 && dataSources.length > 0 && businessContexts.length > 0) {
-      setIsFirstLogin(true);
-      setIsProcessingFirstAnalysis(true);
-      
-      // Polling para verificar si el análisis está listo (cada 5 segundos, máximo 3 minutos)
-      let pollCount = 0;
-      const maxPolls = 36; // 3 minutos (36 * 5 segundos)
-      
-      const pollInterval = setInterval(async () => {
-        pollCount++;
-        
-        try {
-          const { data: latestInsights } = await supabase
-            .from('insights')
-            .select('*')
-            .eq('organization_id', organization.id)
-            .order('generated_at', { ascending: false })
-            .limit(1);
-          
-          if (latestInsights && latestInsights.length > 0) {
-            // Análisis listo!
-            const firstInsight = latestInsights[0] as any;
-            if (firstInsight?.id) {
-              setIsProcessingFirstAnalysis(false);
-              setIsFirstLogin(false);
-              clearInterval(pollInterval);
-              // Refrescar y luego seleccionar el insight
-              router.refresh();
-              // Esperar un momento para que el refresh complete y luego seleccionar
-              setTimeout(() => {
-                setSelectedInsightId(firstInsight.id);
-              }, 500);
-            }
-          } else if (pollCount >= maxPolls) {
-            // Tiempo máximo alcanzado
-            setIsProcessingFirstAnalysis(false);
-            clearInterval(pollInterval);
-          }
-        } catch (error) {
-          console.error('Error verificando insights:', error);
-          if (pollCount >= maxPolls) {
-            setIsProcessingFirstAnalysis(false);
-            clearInterval(pollInterval);
-          }
-        }
-      }, 5000); // Verificar cada 5 segundos
-      
-      // Limpiar intervalo al desmontar
-      return () => clearInterval(pollInterval);
-    } else {
-      setIsFirstLogin(false);
-      setIsProcessingFirstAnalysis(false);
-    }
-  }, [insights.length, dataSources.length, businessContexts.length, organization.id, router, supabase]);
+  // Cada sección con al menos un dato: Datos, Equipo, Negocio (no exige "todo completo")
+  const hasDataSection = hasDataSources && missingFileSources.length === 0;
+  const hasBusinessSection =
+    (businessContexts?.length ?? 0) > 0 &&
+    businessContexts.some((bc: any) => ((bc.content ?? bc.context_text) ?? "").trim() !== "");
+  const hasTeamSection =
+    (teamContexts?.length ?? 0) > 0 || (organizationMembers?.length ?? 0) > 0;
 
   // Ordenar insights por fecha (más reciente primero)
   const sortedInsights = useMemo(() => {
@@ -429,56 +419,70 @@ export function DashboardContent({ organization, insights = [], dataSources = []
   };
 
   const handleStartAnalysis = () => {
-    // Si faltan archivos, mostrar modal primero
-    if (missingFileSources.length > 0) {
+    // Si hay fuentes que usan archivo (Conectar datos), siempre pedir/confirmar archivos antes de analizar
+    if (fileSources.length > 0) {
       setShowFileUploadModal(true);
       return;
     }
 
-    // Si todo está bien, iniciar análisis completo
     startCompleteAnalysis();
   };
 
-  const startCompleteAnalysis = (parsedData?: { nps?: any[]; csat?: any[]; tickets?: any[]; rawData?: { nps?: any[]; csat?: any[]; tickets?: any[] } }) => {
+  const startCompleteAnalysis = (parsedData?: { nps?: any[]; tickets?: any[]; internal_data?: any[]; rawData?: { nps?: any[]; tickets?: any[]; internal_data?: any[] } }) => {
+    if (analyzingRef.current) return; // Una sola ejecución por clic
+    analyzingRef.current = true;
     setStatus("🔄 Iniciando análisis completo...");
-    
+
+    const dataSourceRefs = (dataSources ?? []).map((s: any) => ({
+      id: s.id,
+      source_type: s.source_type,
+      social_platform: s.social_platform,
+      social_username: s.social_username,
+      app_url: s.app_url,
+      app_store_type: s.app_store_type,
+      website_url: s.website_url,
+    }));
+
     startTransition(async () => {
       try {
-        setStatus("🔄 Procesando archivos y recopilando datos...");
-        
-        const result = await runCompleteAnalysis(organization.id, parsedData, parsedData?.rawData);
-        
-        if (result.success) {
-          setStatus(`✅ Análisis completado exitosamente. Insight guardado.`);
-          
-          // Refrescar para mostrar el nuevo insight
-          router.refresh();
-          
-          // Log de metadata
-          if (result.metadata) {
-            console.log('📊 Metadata del análisis:', {
-              archivosProcesados: result.metadata.filesProcessed,
-              scrapersEjecutados: result.metadata.scrapersExecuted,
-              itemsAnalizados: result.metadata.itemsAnalyzed,
-              clustersDetectados: result.metadata.clustersDetected,
-              tiempoProcesamiento: `${(result.metadata.processingTime / 1000).toFixed(1)}s`,
-            });
+        setStatus("🔄 Ejecutando análisis con IA...");
+        const result = await runCompleteAnalysis(
+          organization?.id ?? "",
+          parsedData ? {
+            nps: parsedData.nps ?? [],
+            tickets: parsedData.tickets ?? [],
+            internal_data: parsedData.internal_data ?? [],
+          } : undefined,
+          parsedData?.rawData,
+          {
+            dataSources: dataSourceRefs,
+            businessContexts: businessContexts ?? [],
+            teamContexts: teamContexts ?? [],
           }
+        );
+        if (result.success) {
+          setStatus("✅ Análisis completado.");
+          router.refresh();
         } else {
-          setStatus(`❌ Error: ${result.error || "Error desconocido"}`);
+          setStatus(`❌ Error: ${result.error ?? "Error desconocido"}`);
         }
-      } catch (error: any) {
-        console.error("❌ Error en análisis:", error);
-        setStatus(`❌ Error: ${error.message || "Error al ejecutar el análisis"}`);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Error al ejecutar análisis";
+        console.error("❌ Error:", error);
+        setStatus(`❌ Error: ${message}`);
+      } finally {
+        analyzingRef.current = false;
       }
     });
   };
 
   return (
     <div className="max-w-5xl mx-auto">
-      {/* Loader de análisis mejorado */}
+      {/* Loader cuando se ejecuta un análisis manual */}
       <AnimatePresence>
-        {isPending && <AnalysisLoader isVisible={isPending} />}
+        {isPending && (
+          <AnalysisLoader isVisible={isPending} />
+        )}
       </AnimatePresence>
 
       {/* Modal de subida de archivos */}
@@ -487,10 +491,23 @@ export function DashboardContent({ organization, insights = [], dataSources = []
         onClose={() => setShowFileUploadModal(false)}
         onComplete={(parsedData) => {
           setShowFileUploadModal(false);
-          // Iniciar análisis completo con datos parseados
-          startCompleteAnalysis(parsedData);
+          // Copia explícita para que la server action reciba los datos sin pérdida por referencia/serialización
+          const hasParsed = parsedData && ((parsedData.nps?.length ?? 0) > 0 || (parsedData.tickets?.length ?? 0) > 0 || (parsedData.internal_data?.length ?? 0) > 0 || (parsedData.rawData?.nps?.length ?? 0) > 0 || (parsedData.rawData?.tickets?.length ?? 0) > 0 || (parsedData.rawData?.internal_data?.length ?? 0) > 0);
+          const payload = hasParsed && parsedData
+            ? {
+                nps: Array.isArray(parsedData.nps) ? parsedData.nps : [],
+                tickets: Array.isArray(parsedData.tickets) ? parsedData.tickets : [],
+                internal_data: Array.isArray(parsedData.internal_data) ? parsedData.internal_data : [],
+                rawData: {
+                  nps: Array.isArray(parsedData.rawData?.nps) ? parsedData.rawData.nps : [],
+                  tickets: Array.isArray(parsedData.rawData?.tickets) ? parsedData.rawData.tickets : [],
+                  internal_data: Array.isArray(parsedData.rawData?.internal_data) ? parsedData.rawData.internal_data : [],
+                },
+              }
+            : undefined;
+          startCompleteAnalysis(payload);
         }}
-        missingFiles={missingFileSources}
+        missingFiles={fileSourcesForUpload}
       />
 
       {/* Mini Modal - Todas las fuentes de datos */}
@@ -564,7 +581,7 @@ export function DashboardContent({ organization, insights = [], dataSources = []
                         >
                           {label}
                         </p>
-                        {source.source_type === "nps" || source.source_type === "csat" ? (
+                        {source.source_type === "nps" ? (
                           <p className="text-xs text-neutral-600 mt-0.5">
                             {hasFile ? (
                               <span className="text-green-600 flex items-center gap-1">
@@ -606,6 +623,20 @@ export function DashboardContent({ organization, insights = [], dataSources = []
                               <span className="text-blue-600 flex items-center gap-1">
                                 <Link2 className="w-3 h-3" />
                                 Conectado por API
+                              </span>
+                            )}
+                          </p>
+                        ) : source.source_type === "internal_data" ? (
+                          <p className="text-xs text-neutral-600 mt-0.5">
+                            {hasFile ? (
+                              <span className="text-green-600 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Archivo subido
+                              </span>
+                            ) : (
+                              <span className="text-orange-600 flex items-center gap-1">
+                                <Upload className="w-3 h-3" />
+                                Archivo pendiente de subir
                               </span>
                             )}
                           </p>
@@ -683,17 +714,17 @@ export function DashboardContent({ organization, insights = [], dataSources = []
           </motion.button>
         )}
 
-        {/* Título principal */}
+        {/* Título principal: Hola, [primer nombre] + subtítulo inspirador con company_name */}
         <div className="pr-0 md:pr-20">
           <h1 
-            className="text-4xl md:text-5xl font-bold text-neutral-900 mb-2 leading-tight"
+            className="text-4xl md:text-5xl font-bold text-neutral-900 mb-1 leading-tight"
             style={{
               fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
               fontWeight: 700,
               letterSpacing: '-0.02em'
             }}
           >
-            Hola, {organization?.name || "usuario"}
+            Hola, {(profile?.full_name ?? "").trim().split(/\s+/)[0] || "usuario"}
           </h1>
           <p 
             className="text-lg text-neutral-600"
@@ -701,8 +732,20 @@ export function DashboardContent({ organization, insights = [], dataSources = []
               fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
             }}
           >
-            Genera insights inteligentes que mejoran tu producto
+            {organization?.company_name
+              ? `Hagamos que ${organization.company_name} vaya al siguiente nivel.`
+              : "Juntos llevemos tu producto al siguiente nivel."}
           </p>
+          {insights.length === 1 && (
+            <p 
+              className="mt-4 text-lg text-neutral-600"
+              style={{
+                fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+              }}
+            >
+              Tu análisis está listo. Genera nuevos reportes cuando quieras.
+            </p>
+          )}
         </div>
 
         {/* Widget elegante en móvil */}
@@ -759,17 +802,19 @@ export function DashboardContent({ organization, insights = [], dataSources = []
             </p>
           </motion.div>
         )}
+
       </motion.div>
 
       {/* Área principal - Mostrar insight completo o estado vacío */}
       <motion.div
+        id="primer-reporte"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="relative"
+        className="relative scroll-mt-6"
       >
         {activeInsight ? (
-          // Mostrar reporte completo
+          // Mostrar reporte completo (cuando el insight está listo)
           <FullInsightReport 
             insight={activeInsight}
             previousInsights={previousInsights}
@@ -778,78 +823,112 @@ export function DashboardContent({ organization, insights = [], dataSources = []
             isPending={isPending}
             hasSources={hasSocialSources || hasDataSources}
             organizationId={organization.id}
+            isFirstInsight={insights.length === 1}
+            organization={organization}
+            businessContexts={businessContexts}
+            dataSources={dataSources}
+            hasDataSection={hasDataSection}
+            hasBusinessSection={hasBusinessSection}
+            hasTeamSection={hasTeamSection}
           />
-        ) : isProcessingFirstAnalysis ? (
-          // Estado de procesamiento del primer análisis (loader pequeño)
-          <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center gap-4"
-            >
-              <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
-              <div>
-                <h3 
-                  className="text-xl font-semibold text-neutral-900 mb-2"
-                  style={{
-                    fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-                  }}
-                >
-                  Preparando tu primer análisis
-                </h3>
-                <p 
-                  className="text-sm text-neutral-500"
-                  style={{
-                    fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-                  }}
-                >
-                  Estamos recopilando datos y generando insights automáticamente...
-                </p>
-              </div>
-            </motion.div>
-          </div>
         ) : (
-          // Estado vacío: título y botón solamente
-          <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-            <h3 
-              className="text-3xl md:text-4xl font-bold text-neutral-900 mb-8"
-              style={{
-                fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-                fontWeight: 700,
-                letterSpacing: '-0.02em'
-              }}
-            >
-              Tu primer análisis
-            </h3>
-            
-            {/* Botón de análisis */}
-            <motion.button
-              onClick={handleStartAnalysis}
-              disabled={isPending || (!hasSocialSources && !hasDataSources)}
-              whileHover={{ scale: isPending || (!hasSocialSources && !hasDataSources) ? 1 : 1.02 }}
-              whileTap={{ scale: isPending || (!hasSocialSources && !hasDataSources) ? 1 : 0.98 }}
-              className="btn-black-always flex items-center gap-2 px-8 py-4 rounded-xl font-semibold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-base"
-              style={{
-                fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-              }}
-            >
-                  <Sparkles className="w-5 h-5" />
-                  <span>Iniciar Análisis de Voz de Cliente</span>
-            </motion.button>
-            
-            {!hasSocialSources && !hasDataSources && (
-              <p className="text-sm text-neutral-500 mt-6">
-                Necesitas agregar al menos una fuente de datos primero
-              </p>
-            )}
+          // Onboarding: datos ya vienen del registro — un clic para ver primer reporte. Con vida, color y microinteracciones.
+          <motion.div
+            id="primer-reporte"
+            initial="hidden"
+            animate="visible"
+            variants={{
+              hidden: { opacity: 0 },
+              visible: {
+                opacity: 1,
+                transition: {
+                  staggerChildren: 0.1,
+                  delayChildren: 0.1
+                }
+              }
+            }}
+            className="relative py-6"
+          >
+            <div className="relative space-y-10 px-1">
+              {/* Badges con hover y animación de entrada */}
+              <div className="flex flex-wrap gap-3 justify-start">
+                {[
+                  { icon: Users, label: "Visión 360 unificada", class: "bg-violet-500/5 text-violet-700 border-violet-200/60 hover:bg-violet-500/10 hover:border-violet-300" },
+                  { icon: MessageSquare, label: "Predecir el futuro", class: "bg-rose-500/5 text-rose-700 border-rose-200/60 hover:bg-rose-500/10 hover:border-rose-300" },
+                  { icon: Eye, label: "Respuestas al instante", class: "bg-amber-500/5 text-amber-700 border-amber-200/60 hover:bg-amber-500/10 hover:border-amber-300" },
+                  { icon: Zap, label: "Decisiones más rentables", class: "bg-emerald-500/5 text-emerald-700 border-emerald-200/60 hover:bg-emerald-500/10 hover:border-emerald-300" },
+                ].map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <motion.span
+                      key={item.label}
+                      variants={{
+                        hidden: { opacity: 0, y: 15, scale: 0.95 },
+                        visible: { opacity: 1, y: 0, scale: 1 }
+                      }}
+                      whileHover={{ scale: 1.03, y: -1 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all duration-300 cursor-default ${item.class}`}
+                      style={{ fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif' }}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {item.label}
+                    </motion.span>
+                  );
+                })}
+              </div>
 
-            {missingFileSources.length > 0 && (
-              <p className="text-sm text-orange-600 mt-6 flex items-center justify-center gap-2">
-                <Info className="w-4 h-4" />
-                {missingFileSources.length} archivo(s) pendiente(s) de subir
-              </p>
-            )}
-          </div>
+              {/* Bloque principal: mensaje de un clic + CTA */}
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 20 },
+                  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }
+                }}
+                className="space-y-6"
+              >
+                <div className="space-y-4 max-w-4xl">
+                  <h2
+                    className="text-4xl md:text-6xl font-bold text-neutral-900 leading-[1.1] tracking-tight"
+                    style={{
+                      fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                    }}
+                  >
+                    Entiende a tus usuarios <br className="hidden md:block" />
+                    en un solo clic
+                  </h2>
+                  <p
+                    className="text-lg md:text-xl text-neutral-500 max-w-2xl leading-relaxed font-light"
+                    style={{
+                      fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                    }}
+                  >
+                    Tu primer reporte está generado. Sin configuraciones manuales: descubre patrones clave y oportunidades de mejora al instante.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-6 pt-4">
+                  <motion.button
+                    type="button"
+                    onClick={() => !isPending && handleStartAnalysis()}
+                    disabled={isPending}
+                    whileHover={isPending ? undefined : { scale: 1.02 }}
+                    whileTap={isPending ? undefined : { scale: 0.98 }}
+                    className="btn-black-always flex items-center gap-3 px-8 py-4 text-lg font-semibold rounded-2xl shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ fontFamily: 'var(--font-inter), "Inter", sans-serif' }}
+                  >
+                    <motion.span
+                      animate={{ rotate: isPending ? 360 : 0 }}
+                      transition={{ duration: 0.5, repeat: isPending ? Infinity : 0 }}
+                    >
+                      <Sparkles className="w-5 h-5" />
+                    </motion.span>
+                    {isPending ? "Generando tu reporte…" : "Ver mi primer reporte"}
+                    <ChevronRight className="w-5 h-5" />
+                  </motion.button>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
         )}
       </motion.div>
 
@@ -1033,9 +1112,8 @@ function SourceDataModal({ isOpen, onClose, sourceType, sourceLabel, data }: Sou
           </table>
         );
 
-      // NPS, CSAT, Tickets - Tabla DINÁMICA que detecta columnas automáticamente
+      // NPS, Tickets - Tabla DINÁMICA que detecta columnas automáticamente
       case 'nps':
-      case 'csat':
       case 'tickets':
       default: {
         // Detectar columnas dinámicamente del primer elemento
@@ -1068,16 +1146,13 @@ function SourceDataModal({ isOpen, onClose, sourceType, sourceLabel, data }: Sou
           
           // Detectar si es un número que parece score/rating
           const lowerCol = columnName.toLowerCase();
-          if ((lowerCol.includes('score') || lowerCol.includes('rating') || lowerCol.includes('nps') || lowerCol.includes('csat')) && !isNaN(Number(value))) {
+          if ((lowerCol.includes('score') || lowerCol.includes('rating') || lowerCol.includes('nps')) && !isNaN(Number(value))) {
             const numValue = Number(value);
-            // NPS: 0-10, CSAT: 1-5
+            // NPS: 0-10
             const isNPS = numValue >= 0 && numValue <= 10;
-            const isCSAT = numValue >= 1 && numValue <= 5;
             
-            if (isNPS || isCSAT) {
-              const bgColor = isNPS
-                ? (numValue >= 9 ? 'bg-green-100 text-green-700' : numValue >= 7 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
-                : (numValue >= 4 ? 'bg-green-100 text-green-700' : numValue >= 3 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700');
+            if (isNPS) {
+              const bgColor = numValue >= 9 ? 'bg-green-100 text-green-700' : numValue >= 7 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
               
               return (
                 <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${bgColor}`}>
@@ -1231,6 +1306,223 @@ function SourceDataModal({ isOpen, onClose, sourceType, sourceLabel, data }: Sou
   );
 }
 
+/** Sección reutilizable "Potencia tu análisis" (Conecta datos, Equipo, Negocio + opcionales NPS/tickets/data interna) */
+function PotenciaTuAnalisisSection({
+  dataSources = [],
+  businessContexts = [],
+  setActivePanel,
+  hasDataSection = false,
+  hasBusinessSection = false,
+  hasTeamSection = false,
+}: {
+  dataSources: any[];
+  businessContexts: any[];
+  setActivePanel: (panel: string) => void;
+  hasDataSection?: boolean;
+  hasBusinessSection?: boolean;
+  hasTeamSection?: boolean;
+}) {
+  const hasNPS = dataSources.some((s: any) => s.source_type === "nps" && s.file_path && s.file_name);
+  const hasTickets = dataSources.some((s: any) => s.source_type === "tickets" && (s.file_path || s.tickets_method === "api"));
+  const hasBusinessContext =
+    businessContexts?.length > 0 &&
+    businessContexts.some((bc: any) => ((bc.content || bc.context_text) ?? "").trim() !== "");
+  const hasInternalData = dataSources.some(
+    (s: any) => s.source_type === "internal_data" && s.file_path && s.file_name
+  );
+  const optionalCount = (hasNPS ? 1 : 0) + (hasTickets ? 1 : 0) + (hasBusinessContext ? 1 : 0) + (hasInternalData ? 1 : 0);
+  const baseSectionsComplete = hasDataSection && hasBusinessSection && hasTeamSection;
+
+  return (
+    <motion.div
+      id="potencia-tu-analisis"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 }}
+      className="mt-8 scroll-mt-24"
+    >
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h3
+            className="text-2xl font-bold text-neutral-900 flex items-center gap-2"
+            style={{
+              fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+              fontWeight: 700,
+            }}
+          >
+            <Lightbulb className="w-6 h-6 text-[#8A2BE2]" />
+            Potencia tu análisis
+          </h3>
+          {baseSectionsComplete ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30">
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-semibold text-green-700">
+                Configuración lista
+              </span>
+            </div>
+          ) : optionalCount > 0 ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#8A2BE2]/10 to-[#C2185B]/10 border border-[#8A2BE2]/20">
+              <span className="text-sm font-semibold text-[#8A2BE2]">
+                {optionalCount} de 4 opcionales
+              </span>
+            </div>
+          ) : null}
+        </div>
+        <p
+          className="text-neutral-600"
+          style={{
+            fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+          }}
+        >
+          {baseSectionsComplete
+            ? "Opciones adicionales para insights aún más precisos"
+            : "Agrega más datos para obtener insights aún más precisos y accionables"}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+          whileHover={{ scale: 1.02, y: -2 }}
+          className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/50 border-2 border-blue-300/60 p-6 cursor-pointer shadow-md"
+          onClick={() => setActivePanel("team")}
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-200/20 rounded-full -mr-16 -mt-16" />
+          <div className="absolute top-3 right-3">
+            <span className="px-2.5 py-1 text-xs font-bold text-white bg-gradient-to-r from-[#8A2BE2] to-[#C2185B] rounded-full shadow-sm">
+              Recomendado
+            </span>
+          </div>
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-blue-500/10 rounded-lg">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+              <h4 className="text-lg font-bold text-neutral-900" style={{ fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                Define a tu equipo
+              </h4>
+            </div>
+            <p className="text-sm text-neutral-700 mb-4" style={{ fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif' }}>
+              Indica los miembros de tu equipo y sus roles. Así podremos asignar tareas y reportes automáticamente.
+            </p>
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-600 group-hover:text-blue-700 transition-colors">
+              <span>Configurar</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.5 }}
+          whileHover={{ scale: 1.02, y: -2 }}
+          className={`group relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-50 to-purple-100/50 border ${hasNPS ? "border-purple-300/60 border-2" : "border-purple-200/50"} p-6 cursor-pointer ${hasNPS ? "shadow-md" : ""}`}
+          onClick={() => setActivePanel("data")}
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-200/20 rounded-full -mr-16 -mt-16" />
+          {hasNPS && (
+            <div className="absolute top-3 right-3">
+              <div className="p-1.5 bg-green-500 rounded-full shadow-sm">
+                <CheckCircle2 className="w-4 h-4 text-white" />
+              </div>
+            </div>
+          )}
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-purple-500/10 rounded-lg">
+                <Star className="w-5 h-5 text-purple-600" />
+              </div>
+              <h4 className="text-lg font-bold text-neutral-900" style={{ fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                Termina de poner tu feedback público
+              </h4>
+            </div>
+            <p className="text-sm text-neutral-700 mb-4" style={{ fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif' }}>
+              Sube tus encuestas NPS, tickets de soporte y cualquier feedback público de tus usuarios.
+            </p>
+            <div className="flex items-center gap-2 text-sm font-semibold text-purple-600 group-hover:text-purple-700 transition-colors">
+              <span>Agregar</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.6 }}
+          whileHover={{ scale: 1.02, y: -2 }}
+          className={`group relative overflow-hidden rounded-xl bg-gradient-to-br from-orange-50 to-orange-100/50 border ${hasTickets ? "border-orange-300/60 border-2" : "border-orange-200/50"} p-6 cursor-pointer ${hasTickets ? "shadow-md" : ""}`}
+          onClick={() => setActivePanel("business")}
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-orange-200/20 rounded-full -mr-16 -mt-16" />
+          {hasTickets && (
+            <div className="absolute top-3 right-3">
+              <div className="p-1.5 bg-green-500 rounded-full shadow-sm">
+                <CheckCircle2 className="w-4 h-4 text-white" />
+              </div>
+            </div>
+          )}
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-orange-500/10 rounded-lg">
+                <MessageSquare className="w-5 h-5 text-orange-600" />
+              </div>
+              <h4 className="text-lg font-bold text-neutral-900" style={{ fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                Configura el contexto de tu empresa
+              </h4>
+            </div>
+            <p className="text-sm text-neutral-700 mb-4" style={{ fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif' }}>
+              Comparte la información estratégica de tu empresa: misión, visión, objetivos y lineamientos de negocio.
+            </p>
+            <div className="flex items-center gap-2 text-sm font-semibold text-orange-600 group-hover:text-orange-700 transition-colors">
+              <span>Conectar</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.7 }}
+          whileHover={{ scale: 1.02, y: -2 }}
+          className={`group relative overflow-hidden rounded-xl bg-gradient-to-br from-green-50 to-green-100/50 border ${hasInternalData ? "border-green-300/60 border-2" : "border-green-200/50"} p-6 cursor-pointer ${hasInternalData ? "shadow-md" : ""}`}
+          onClick={() => setActivePanel("data")}
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-green-200/20 rounded-full -mr-16 -mt-16" />
+          {hasInternalData && (
+            <div className="absolute top-3 right-3">
+              <div className="p-1.5 bg-green-500 rounded-full shadow-sm">
+                <CheckCircle2 className="w-4 h-4 text-white" />
+              </div>
+            </div>
+          )}
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-green-500/10 rounded-lg">
+                <Target className="w-5 h-5 text-green-600" />
+              </div>
+              <h4 className="text-lg font-bold text-neutral-900" style={{ fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                Sube tus data interna
+              </h4>
+            </div>
+            <p className="text-sm text-neutral-700 mb-4" style={{ fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif' }}>
+              Sube tus datos internos de producto: funnels de conversión, métricas, logs de errores y comportamiento de usuarios.
+            </p>
+            <div className="flex items-center gap-2 text-sm font-semibold text-green-600 group-hover:text-green-700 transition-colors">
+              <span>Completar</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+}
+
 function FullInsightReport({ 
   insight, 
   previousInsights, 
@@ -1238,7 +1530,14 @@ function FullInsightReport({
   onCreateNew,
   isPending,
   hasSources,
-  organizationId
+  organizationId,
+  isFirstInsight = false,
+  organization,
+  businessContexts = [],
+  dataSources = [],
+  hasDataSection = false,
+  hasBusinessSection = false,
+  hasTeamSection = false,
 }: { 
   insight: any; 
   previousInsights: any[];
@@ -1247,6 +1546,13 @@ function FullInsightReport({
   isPending: boolean;
   hasSources: boolean;
   organizationId: string;
+  isFirstInsight?: boolean;
+  organization?: any;
+  businessContexts?: any[];
+  dataSources?: any[];
+  hasDataSection?: boolean;
+  hasBusinessSection?: boolean;
+  hasTeamSection?: boolean;
 }) {
   const { setActivePanel } = useDashboard();
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -1303,9 +1609,12 @@ function FullInsightReport({
   
   const priorityColor = priorityColors[insight.priority as keyof typeof priorityColors] || priorityColors.medium;
 
-  // Obtener conteos y datos crudos desde generation_metadata
-  const sourceCounts = insight.generation_metadata?.sourceCounts || {};
-  const rawData = insight.generation_metadata?.rawData || {};
+  // Obtener conteos y datos crudos desde generation_metadata (soportar JSONB como objeto o string)
+  const generationMetadata = typeof insight.generation_metadata === 'string'
+    ? (() => { try { return JSON.parse(insight.generation_metadata); } catch { return {}; } })()
+    : (insight.generation_metadata || {});
+  const sourceCounts = generationMetadata.sourceCounts || {};
+  const rawData = generationMetadata.rawData || {};
   
   // Handler para abrir el modal con los datos de una fuente
   const handleOpenSourceData = (type: string, label: string) => {
@@ -1362,16 +1671,6 @@ function FullInsightReport({
       });
     }
     
-    if (sourceCounts.csat && sourceCounts.csat > 0) {
-      capsules.push({
-        type: 'csat',
-        icon: FileText,
-        label: 'CSAT',
-        count: sourceCounts.csat,
-        hasData: rawData.csat && rawData.csat.length > 0,
-      });
-    }
-    
     if (sourceCounts.tickets && sourceCounts.tickets > 0) {
       capsules.push({
         type: 'tickets',
@@ -1382,12 +1681,21 @@ function FullInsightReport({
       });
     }
     
+    if (sourceCounts.internal_data && sourceCounts.internal_data > 0) {
+      capsules.push({
+        type: 'internal_data',
+        icon: Database,
+        label: 'Data Interna',
+        count: sourceCounts.internal_data,
+        hasData: rawData.internal_data && rawData.internal_data.length > 0,
+      });
+    }
+    
     return capsules;
   }, [sourceCounts, rawData]);
 
   return (
     <div className="space-y-4">
-      {/* Botones arriba */}
       <div className="flex items-center justify-end gap-3">
         {/* Botón "Enviar Reporte" */}
         <motion.button
@@ -1433,8 +1741,8 @@ function FullInsightReport({
             fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
           }}
         >
-              <Sparkles className="w-4 h-4" />
-              <span>Nuevo análisis</span>
+          <Sparkles className="w-4 h-4" />
+          <span>Nuevo análisis</span>
         </motion.button>
       </div>
 
@@ -1455,7 +1763,7 @@ function FullInsightReport({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="rounded-2xl bg-white border border-neutral-200/50 p-8 md:p-12 shadow-sm"
+        className={`rounded-2xl bg-white border ${isFirstInsight ? 'border-[#8A2BE2]/30 shadow-lg' : 'border-neutral-200/50 shadow-sm'} p-8 md:p-12 relative overflow-hidden`}
       >
         {/* Cápsulas de fuentes - Pegadas al techo de la card */}
         {sourceCapsules.length > 0 && (
@@ -1533,18 +1841,32 @@ function FullInsightReport({
         
         <MarkdownRenderer content={markdownContent} className="text-neutral-900" />
         
-        {/* Botón "Ver todos" al final del reporte */}
-        <div className="mt-8 pt-6 border-t border-neutral-200/50 flex justify-center">
-          <motion.button
-            onClick={() => setActivePanel("insights")}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="px-6 py-2.5 text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
-          >
-            Ver todos los reportes
-          </motion.button>
-        </div>
-      </motion.div>
+        {/* Botón "Ver todos" al final del reporte - Solo si NO es el primer insight */}
+        {!isFirstInsight && (
+          <div className="mt-8 pt-6 border-t border-neutral-200/50 flex justify-center">
+            <motion.button
+              onClick={() => setActivePanel("insights")}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="px-6 py-2.5 text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
+            >
+              Ver todos los reportes
+                </motion.button>
+          </div>
+        )}
+        </motion.div>
+
+      {/* Potencia tu análisis: se muestra en el primer reporte para invitar a agregar más datos */}
+      {isFirstInsight && (
+        <PotenciaTuAnalisisSection
+          dataSources={dataSources}
+          businessContexts={businessContexts}
+          setActivePanel={setActivePanel}
+          hasDataSection={hasDataSection}
+          hasBusinessSection={hasBusinessSection}
+          hasTeamSection={hasTeamSection}
+        />
+      )}
 
       {/* Modal de datos de fuente */}
       <AnimatePresence>

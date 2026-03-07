@@ -2,23 +2,27 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Plus, Loader2, FileText, Target } from "lucide-react";
 import { motion } from "framer-motion";
-import { useDashboard } from "./DashboardContext";
+
+export type BusinessContextFormPayload = {
+  organization_id: string;
+  name: string;
+  content: string;
+  id?: string;
+};
 
 interface BusinessContextFormProps {
   organizationId: string;
   onCancel?: () => void;
-  showFormOnly?: boolean; // Si es true, siempre muestra el formulario (para primera vez)
+  showFormOnly?: boolean;
   existingContext?: any;
+  /** Conectar al backend: POST /api/business-context (o equivalente) */
+  onSave?: (payload: BusinessContextFormPayload) => Promise<void>;
 }
 
-export function BusinessContextForm({ organizationId, onCancel, showFormOnly = false, existingContext }: BusinessContextFormProps) {
+export function BusinessContextForm({ organizationId, onCancel, showFormOnly = false, existingContext, onSave }: BusinessContextFormProps) {
   const router = useRouter();
-  const supabase = createClient();
-  const { setActivePanel } = useDashboard();
-  // Si hay onCancel o showFormOnly, el formulario debe estar abierto desde el inicio
   const [isOpen, setIsOpen] = useState(showFormOnly || !!onCancel || !!existingContext);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -33,124 +37,21 @@ export function BusinessContextForm({ organizationId, onCancel, showFormOnly = f
     setIsLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const payload: BusinessContextFormPayload = {
+        organization_id: organizationId,
+        name: formData.name.trim(),
+        content: formData.content.trim(),
+      };
+      if (existingContext?.id) payload.id = existingContext.id;
 
-      if (!user) {
-        throw new Error("No estás autenticado");
+      if (onSave) {
+        await onSave(payload);
       }
 
-      // Insertar o actualizar contexto de negocio
-      if (existingContext?.id) {
-        // Modo edición: actualizar
-        const { error: updateError } = await supabase
-          .from("business_context")
-          // @ts-ignore - Supabase types issue
-          .update({
-            name: formData.name.trim(),
-            content: formData.content.trim(),
-          })
-          .eq("id", existingContext.id);
-
-        if (updateError) {
-          throw updateError;
-        }
-
-        // Limpiar formulario y cerrar
-        setFormData({ name: "", content: "" });
-        setIsOpen(false);
-
-        if (onCancel) {
-          onCancel();
-        }
-
-        router.refresh();
-        window.location.reload();
-        return;
-      } else {
-        // Modo creación: insertar
-        const { error: insertError } = await supabase
-          .from("business_context")
-          // @ts-ignore - Supabase types issue
-          .insert({
-            organization_id: organizationId,
-            name: formData.name.trim(),
-            content: formData.content.trim(),
-            created_by: user.id,
-          });
-
-        if (insertError) {
-          throw insertError;
-        }
-
-        // Verificar si es el primer contexto para marcar el paso 1 como completado
-        const { data: existingContexts } = await supabase
-          .from("business_context")
-          .select("id")
-          .eq("organization_id", organizationId);
-
-        if (existingContexts && existingContexts.length === 1) {
-        // Es el primer contexto, marcar paso 1 como completado
-        const { data: existingProgress, error: selectError } = await supabase
-          .from("onboarding_progress")
-          .select("id")
-          .eq("organization_id", organizationId)
-          .maybeSingle(); // Usar maybeSingle en lugar de single para manejar cuando no existe
-
-        if (selectError) {
-          console.error('[BusinessContextForm] Error al consultar progreso:', selectError);
-        }
-
-        if (existingProgress) {
-          // Actualizar progreso existente
-          const { error: updateError } = await supabase
-            .from("onboarding_progress")
-            // @ts-ignore - Supabase types issue
-            .update({
-              step_1_completed: true,
-              step_1_completed_at: new Date().toISOString(),
-            })
-            .eq("organization_id", organizationId);
-          
-          if (updateError) {
-            console.error('[BusinessContextForm] Error al actualizar progreso:', updateError);
-            throw updateError;
-          }
-        } else {
-          // Crear registro de progreso
-          const { error: insertError } = await supabase
-            .from("onboarding_progress")
-            // @ts-ignore - Supabase types issue
-            .insert({
-              organization_id: organizationId,
-              step_1_completed: true,
-              step_1_completed_at: new Date().toISOString(),
-            });
-          
-          if (insertError) {
-            console.error('[BusinessContextForm] Error al crear progreso:', insertError);
-            throw insertError;
-          }
-        }
-      }
-
-      // Limpiar formulario y cerrar
       setFormData({ name: "", content: "" });
       setIsOpen(false);
-      
-      // Si es el primer contexto, cambiar al panel dashboard y refrescar completamente
-      if (existingContexts && existingContexts.length === 1) {
-        setActivePanel('dashboard');
-        // Usar reload para asegurar que los datos se actualicen correctamente
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
-      } else {
-        router.refresh();
-        window.location.reload();
-      }
-      }
+      if (onCancel) onCancel();
+      router.refresh();
     } catch (err: any) {
       setError(err.message || "Error al guardar el contexto");
     } finally {

@@ -17,17 +17,17 @@ import {
 } from "lucide-react";
 import { TeamMemberForm } from "./TeamMemberForm";
 import { TeamMemberList } from "./TeamMemberList";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 interface SettingsPanelProps {
   organization: any;
   organizationMembers?: any[];
+  /** Conectar al backend: PATCH /api/organizations/:id (o equivalente) */
+  onSaveOrganization?: (payload: { name: string }) => Promise<void>;
 }
 
-export function SettingsPanel({ organization, organizationMembers = [] }: SettingsPanelProps) {
+export function SettingsPanel({ organization, organizationMembers = [], onSaveOrganization }: SettingsPanelProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [isEditingOrg, setIsEditingOrg] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -36,19 +36,12 @@ export function SettingsPanel({ organization, organizationMembers = [] }: Settin
   });
 
   const handleSaveOrg = async () => {
+    if (!organization?.id) return;
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from("organizations")
-        // @ts-ignore - Supabase client types issue with generic table
-        .update({ name: orgFormData.name.trim() })
-        .eq("id", organization.id);
-
-      if (error) throw error;
-
+      if (onSaveOrganization) await onSaveOrganization({ name: orgFormData.name.trim() });
       setIsEditingOrg(false);
       router.refresh();
-      window.location.reload();
     } catch (err) {
       console.error("Error al actualizar:", err);
       alert("Error al actualizar la organización");

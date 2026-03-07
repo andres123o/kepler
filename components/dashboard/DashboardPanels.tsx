@@ -25,10 +25,9 @@ interface BusinessContext {
 
 interface TeamContext {
   id: string;
-  name: string;
-  email: string | null;
-  expertise: string;
-  responsible_for: string;
+  nombre: string;
+  rol: string | null;
+  foco: string | null;
   created_at: string;
 }
 

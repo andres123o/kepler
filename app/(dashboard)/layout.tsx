@@ -1,66 +1,43 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getBackendUrl } from '@/lib/backend'
 import { DashboardLayoutClient } from '@/components/dashboard/DashboardLayoutClient'
 
+/** Dashboard: Auth en frontend; perfil y organización vía GET /api/me del backend. */
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
     redirect('/login')
   }
 
-  // Obtener perfil del usuario
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  let profile: unknown = null
+  let organization: unknown = null
 
-  // Obtener organización del usuario
-  const { data: organization } = await supabase
-    .from('organizations')
-    .select('*')
-    .eq('owner_id', user.id)
-    .single()
-
-  // Si no tiene organización, crearla (fallback)
-  if (!organization && profile) {
-    const profileData = profile as { full_name?: string | null; [key: string]: any };
-    const { data: newOrg } = await supabase
-      .from('organizations')
-      .insert({
-        name: `${profileData.full_name || 'Usuario'}'s Organization`,
-        slug: `${user.id}-${Date.now()}`,
-        owner_id: user.id,
-        plan: 'hobby',
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        subscription_status: 'trial',
-      } as any)
-      .select()
-      .single()
-
-    if (newOrg) {
-      return (
-        <DashboardLayoutClient organization={newOrg} profile={profile}>
-          {children}
-        </DashboardLayoutClient>
-      )
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.access_token) {
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/me`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        profile = data.profile ?? null
+        organization = data.organization ?? null
+      }
+    } catch {
+      // Backend no disponible o error de red; se muestran null
     }
   }
 
   return (
-    <DashboardLayoutClient 
-      organization={organization || null} 
-      profile={profile || null}
-    >
+    <DashboardLayoutClient organization={organization} profile={profile}>
       {children}
     </DashboardLayoutClient>
   )

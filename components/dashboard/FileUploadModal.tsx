@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
-import { NPSSurvey, CSATSurvey, Ticket } from "@/app/agents/kepler/types";
+import { NPSSurvey, Ticket, InternalDataRow } from "@/lib/types/analysis";
 
 // Funciones helper para parsear archivos en el cliente
 async function fileToText(file: File): Promise<string> {
@@ -77,51 +77,6 @@ async function parseNPSFile(file: File, sourceId: string): Promise<{ surveys: NP
   return { surveys, rawRows };
 }
 
-async function parseCSATFile(file: File, sourceId: string): Promise<{ surveys: CSATSurvey[], rawRows: Record<string, string>[] }> {
-  const text = await fileToText(file);
-  const surveys: CSATSurvey[] = [];
-  const rawRows: Record<string, string>[] = [];
-  const fileType = file.name.split('.').pop()?.toLowerCase() || '';
-  
-  if (fileType === 'csv' || fileType === 'txt') {
-    const rows = parseCSV(text);
-    rawRows.push(...rows); // Guardar datos crudos
-    rows.forEach((row, idx) => {
-      const score = parseInt(row.score || row.csat || row.rating || '0');
-      const comment = row.comment || row.comentario || row.feedback || row.text || '';
-      const timestamp = row.timestamp || row.date || row.fecha || new Date().toISOString();
-      if (score >= 0 && score <= 5) {
-        surveys.push({
-          id: `${sourceId}-csat-${idx}`,
-          score,
-          comment: comment || undefined,
-          timestamp,
-          source: 'file',
-        });
-      }
-    });
-  } else if (fileType === 'json') {
-    const data = JSON.parse(text);
-    const items = Array.isArray(data) ? data : [data];
-    rawRows.push(...items); // Guardar datos crudos
-    items.forEach((item: any, idx: number) => {
-      const score = parseInt(item.score || item.csat || item.rating || '0');
-      const comment = item.comment || item.comentario || item.feedback || item.text || '';
-      const timestamp = item.timestamp || item.date || item.fecha || new Date().toISOString();
-      if (score >= 0 && score <= 5) {
-        surveys.push({
-          id: `${sourceId}-csat-${idx}`,
-          score,
-          comment: comment || undefined,
-          timestamp,
-          source: 'file',
-        });
-      }
-    });
-  }
-  return { surveys, rawRows };
-}
-
 async function parseTicketsFile(file: File, sourceId: string): Promise<{ tickets: Ticket[], rawRows: Record<string, string>[] }> {
   const text = await fileToText(file);
   const tickets: Ticket[] = [];
@@ -179,17 +134,37 @@ async function parseTicketsFile(file: File, sourceId: string): Promise<{ tickets
   return { tickets, rawRows };
 }
 
+async function parseInternalDataFile(file: File, _sourceId: string): Promise<{ internal_data: InternalDataRow[] }> {
+  const text = await fileToText(file);
+  const fileType = file.name.split('.').pop()?.toLowerCase() || '';
+  const rows: InternalDataRow[] = [];
+  if (fileType === 'csv' || fileType === 'txt') {
+    rows.push(...parseCSV(text));
+  } else if (fileType === 'json') {
+    const data = JSON.parse(text);
+    const items = Array.isArray(data) ? data : [data];
+    items.forEach((item: any) => {
+      if (item && typeof item === 'object') {
+        const row: Record<string, string> = {};
+        Object.keys(item).forEach((k) => { row[k] = String(item[k] ?? ''); });
+        rows.push(row);
+      }
+    });
+  }
+  return { internal_data: rows };
+}
+
 interface FileUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onComplete: (parsedData: {
+  onComplete: (parsedData?: {
     nps?: NPSSurvey[];
-    csat?: CSATSurvey[];
     tickets?: Ticket[];
+    internal_data?: InternalDataRow[];
     rawData?: {
       nps?: Record<string, string>[];
-      csat?: Record<string, string>[];
       tickets?: Record<string, string>[];
+      internal_data?: Record<string, string>[];
     };
   }) => void;
   missingFiles: Array<{
@@ -204,12 +179,12 @@ export function FileUploadModal({ isOpen, onClose, onComplete, missingFiles }: F
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File>>({});
   const [parsedData, setParsedData] = useState<{
     nps?: NPSSurvey[];
-    csat?: CSATSurvey[];
     tickets?: Ticket[];
+    internal_data?: InternalDataRow[];
     rawData?: {
       nps?: Record<string, string>[];
-      csat?: Record<string, string>[];
       tickets?: Record<string, string>[];
+      internal_data?: Record<string, string>[];
     };
   }>({});
   const [parsingStatus, setParsingStatus] = useState<Record<string, "idle" | "parsing" | "success" | "error">>({});
@@ -264,16 +239,6 @@ export function FileUploadModal({ isOpen, onClose, onComplete, missingFiles }: F
             nps: prev.rawData?.nps ? [...prev.rawData.nps, ...rawRows] : rawRows,
           }
         }));
-      } else if (sourceType === "csat") {
-        const { surveys, rawRows } = await parseCSATFile(file, sourceId);
-        setParsedData((prev) => ({ 
-          ...prev, 
-          csat: prev.csat ? [...prev.csat, ...surveys] : surveys,
-          rawData: {
-            ...prev.rawData,
-            csat: prev.rawData?.csat ? [...prev.rawData.csat, ...rawRows] : rawRows,
-          }
-        }));
       } else if (sourceType === "tickets") {
         const { tickets, rawRows } = await parseTicketsFile(file, sourceId);
         setParsedData((prev) => ({ 
@@ -282,6 +247,16 @@ export function FileUploadModal({ isOpen, onClose, onComplete, missingFiles }: F
           rawData: {
             ...prev.rawData,
             tickets: prev.rawData?.tickets ? [...prev.rawData.tickets, ...rawRows] : rawRows,
+          }
+        }));
+      } else if (sourceType === "internal_data") {
+        const { internal_data } = await parseInternalDataFile(file, sourceId);
+        setParsedData((prev) => ({ 
+          ...prev, 
+          internal_data: prev.internal_data ? [...prev.internal_data, ...internal_data] : internal_data,
+          rawData: {
+            ...prev.rawData,
+            internal_data: prev.rawData?.internal_data ? [...prev.rawData.internal_data, ...internal_data] : internal_data,
           }
         }));
       }
@@ -469,7 +444,7 @@ export function FileUploadModal({ isOpen, onClose, onComplete, missingFiles }: F
                 })}
               </div>
 
-              {/* Footer */}
+              {/* Footer: subir archivos → procesar → Continuar con el análisis (datos en memoria al agente) */}
               <div className="border-t border-neutral-200/50 p-6 bg-gradient-to-br from-neutral-50/50 to-transparent">
                 <div className="flex items-center justify-end gap-3">
                   <button
@@ -479,7 +454,7 @@ export function FileUploadModal({ isOpen, onClose, onComplete, missingFiles }: F
                     Cancelar
                   </button>
                   <motion.button
-                    onClick={handleComplete}
+                    onClick={() => handleComplete()}
                     disabled={!allFilesParsed || Object.keys(parsedData).length === 0}
                     whileHover={allFilesParsed && Object.keys(parsedData).length > 0 ? { scale: 1.02 } : {}}
                     whileTap={allFilesParsed && Object.keys(parsedData).length > 0 ? { scale: 0.98 } : {}}

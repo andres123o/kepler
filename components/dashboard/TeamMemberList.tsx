@@ -1,7 +1,6 @@
 "use client";
 
 import { Trash2, User, Shield, Mail } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
@@ -19,6 +18,8 @@ interface TeamMember {
 
 interface TeamMemberListProps {
   members: TeamMember[];
+  /** Conectar al backend: DELETE /api/organization-members/:id (o equivalente) */
+  onDelete?: (id: string) => Promise<void>;
 }
 
 // Gradientes del arcoíris (mismos que business_context)
@@ -60,28 +61,18 @@ function getRelativeTime(dateString: string): string {
   return date.toLocaleDateString("es-ES", { year: "numeric", month: "short", day: "numeric" });
 }
 
-export function TeamMemberList({ members }: TeamMemberListProps) {
+export function TeamMemberList({ members, onDelete }: TeamMemberListProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este miembro del equipo?")) {
-      return;
-    }
+    if (!confirm("¿Estás seguro de que quieres eliminar este miembro del equipo?")) return;
 
     setDeletingId(id);
     try {
-      const { error } = await supabase
-        .from("organization_members")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
+      if (onDelete) await onDelete(id);
       router.refresh();
-      window.location.reload();
     } catch (err) {
       console.error("Error al eliminar:", err);
       alert("Error al eliminar el miembro");

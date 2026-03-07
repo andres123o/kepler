@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2, Check, Instagram, Smartphone, Building2 } from "lucide-react";
+import { Loader2, Check, Instagram, Smartphone, Building2, Mail } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { createOrganizationImmediate } from "@/app/actions/create-organization-immediate";
@@ -20,9 +20,10 @@ function RegisterForm() {
   const [fullName, setFullName] = useState("");
   
   // Campos adicionales
-  const [companyName, setCompanyName] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [instagramUsername, setInstagramUsername] = useState("");
   const [playStoreUrl, setPlayStoreUrl] = useState("");
+  const [appStoreUrl, setAppStoreUrl] = useState("");
   
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false);
@@ -30,13 +31,24 @@ function RegisterForm() {
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const [showAdditionalFields, setShowAdditionalFields] = useState(false);
   const [basicFieldsValid, setBasicFieldsValid] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   // Validación en tiempo real
   const [instagramValid, setInstagramValid] = useState<boolean | null>(null);
   const [playStoreValid, setPlayStoreValid] = useState<boolean | null>(null);
+  const [appStoreValid, setAppStoreValid] = useState<boolean | null>(null);
 
   const supabase = createClient();
-  
+
+  /** URL base para redirecciones. En localhost SIEMPRE usamos origin para que el link de
+   *  confirmación de email lleve a dev y el primer GET /api/me sea al backend de dev. */
+  const getBaseUrl = (): string => {
+    if (typeof window === "undefined") return process.env.NEXT_PUBLIC_APP_URL ?? "";
+    const { hostname, origin } = window.location;
+    if (hostname === "localhost" || hostname.includes("127.0.0.1")) return origin;
+    return process.env.NEXT_PUBLIC_APP_URL || "https://www.iskepler.com";
+  };
+
   // Validar campos básicos
   const validateBasicFields = () => {
     const valid = fullName.trim() !== "" && 
@@ -66,20 +78,16 @@ function RegisterForm() {
     const playStorePattern = /play\.google\.com\/store\/apps\/details/i;
     setPlayStoreValid(playStorePattern.test(url));
   };
-  
-  // Auto-completar nombre empresa desde email
-  useEffect(() => {
-    if (email && !companyName) {
-      const emailDomain = email.split("@")[1];
-      if (emailDomain) {
-        const domainName = emailDomain.split(".")[0];
-        if (domainName && domainName.length > 2) {
-          const capitalized = domainName.charAt(0).toUpperCase() + domainName.slice(1);
-          setCompanyName(capitalized);
-        }
-      }
+
+  // Validar App Store URL
+  const validateAppStore = (url: string) => {
+    if (!url.trim()) {
+      setAppStoreValid(null);
+      return;
     }
-  }, [email, companyName]);
+    const appStorePattern = /(?:apps\.apple\.com|itunes\.apple\.com)\/.*\/id\d+/i;
+    setAppStoreValid(appStorePattern.test(url));
+  };
   
   // Validar campos básicos en tiempo real
   useEffect(() => {
@@ -87,11 +95,12 @@ function RegisterForm() {
   }, [fullName, email, password]);
   
   // Validar campos adicionales
-  const validateAdditionalFields = () => {
-    return companyName.trim() !== "" && 
-           instagramUsername.trim() !== "" && 
-           playStoreUrl.trim() !== "";
-  };
+  const urlPattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i;
+  const validateAdditionalFields = () =>
+    websiteUrl.trim() !== "" &&
+    urlPattern.test(websiteUrl.trim()) &&
+    instagramUsername.trim() !== "" &&
+    playStoreUrl.trim() !== "";
 
   const handleBasicFieldsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,21 +128,20 @@ function RegisterForm() {
     setIsLoading(true);
 
     try {
-      // Determinar la URL base para redirecciones
-      let baseUrl = window.location.origin;
-      if (process.env.NEXT_PUBLIC_APP_URL) {
-        baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-      } else if (window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1')) {
-        baseUrl = 'https://www.iskepler.com';
-      }
+      const baseUrl = getBaseUrl() || (typeof window !== "undefined" ? window.location.origin : "");
 
-      // 1. Crear usuario en Supabase Auth
+      // 1. Crear usuario en Supabase Auth. Guardamos todo el segundo formulario en user_metadata
+      // para que, al confirmar el email e iniciar sesión, el backend pueda crear data_sources en GET /api/me
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
+            website_url: websiteUrl.trim(),
+            instagram_username: instagramUsername.trim() || undefined,
+            play_store_url: playStoreUrl.trim() || undefined,
+            app_store_url: appStoreUrl.trim() || undefined,
           },
           emailRedirectTo: `${baseUrl}/auth/callback?plan=${selectedPlan}`,
         },
@@ -145,62 +153,37 @@ function RegisterForm() {
         throw new Error("No se pudo crear el usuario");
       }
 
-      // 2. Verificar si necesita confirmar email
+      // 2. Confirmación de email activada: no hay sesión aún. Los datos del formulario
+      // ya están en user_metadata; al confirmar e iniciar sesión, GET /api/me creará
+      // la organización y las data_sources en el backend.
       if (authData.user && !authData.session) {
-        // Email confirmation está habilitado
-        // Crear organización y data sources inmediatamente (no esperar confirmación)
-        // El scraping y análisis se ejecutarán en background
-        createOrganizationImmediate(
-          authData.user.id,
-          companyName.trim(),
-          instagramUsername.trim() || undefined,
-          playStoreUrl.trim() || undefined,
-          selectedPlan
-        )
-          .then((result) => {
-            if (result.success) {
-              console.log(`✅ Organización creada inmediatamente: ${result.organizationId}`)
-            } else {
-              console.error(`⚠️ Error al crear organización: ${result.error}`)
-            }
-          })
-          .catch((error) => {
-            console.error('⚠️ Error al ejecutar createOrganizationImmediate:', error)
-          })
-
-        setError("");
-        setIsLoading(false);
-        alert("¡Registro exitoso! Por favor, revisa tu correo y haz clic en el enlace de confirmación para activar tu cuenta. Luego podrás iniciar sesión.");
-        router.push("/login");
-        return;
+        setError("")
+        setIsLoading(false)
+        setShowSuccessModal(true)
+        return
       }
 
       // 3. Si tiene sesión activa (sin confirmación de email), crear organización inmediatamente
       if (authData.session && authData.user) {
         // Crear organización y data sources inmediatamente (mismo flujo que sin sesión)
-        createOrganizationImmediate(
+        // El nombre se extraerá automáticamente desde la URL en el servidor
+        const result = await createOrganizationImmediate(
           authData.user.id,
-          companyName.trim(),
+          "",
+          websiteUrl.trim(),
           instagramUsername.trim() || undefined,
           playStoreUrl.trim() || undefined,
+          appStoreUrl.trim() || undefined,
           selectedPlan
         )
-          .then((result) => {
-            if (result.success) {
-              console.log(`✅ Organización creada inmediatamente: ${result.organizationId}`)
-            } else {
-              console.error(`⚠️ Error al crear organización: ${result.error}`)
-            }
-          })
-          .catch((error) => {
-            console.error('⚠️ Error al ejecutar createOrganizationImmediate:', error)
-          })
-
-        // Redirigir al dashboard
-        router.push("/dashboard");
+        if (result.success) {
+          router.push("/dashboard");
+        } else {
+          setError(result.error ?? 'No se pudieron guardar las fuentes. Podrás añadirlas desde el dashboard.')
+        }
       }
-    } catch (err: any) {
-      setError(err.message || "Error al crear la cuenta");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error al crear la cuenta");
     } finally {
       setIsLoading(false);
     }
@@ -212,15 +195,7 @@ function RegisterForm() {
     setIsOAuthLoading(true);
 
     try {
-      // Determinar la URL base: usar variable de entorno, o detectar producción, o usar origin actual
-      let baseUrl = window.location.origin;
-      if (process.env.NEXT_PUBLIC_APP_URL) {
-        baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-      } else if (window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1')) {
-        // En producción, usar la URL de producción
-        baseUrl = 'https://www.iskepler.com';
-      }
-      
+      const baseUrl = getBaseUrl() || (typeof window !== "undefined" ? window.location.origin : "");
       const redirectUrl = `${baseUrl}/auth/callback?plan=${selectedPlan}`;
       
       const { error } = await supabase.auth.signInWithOAuth({
@@ -231,14 +206,73 @@ function RegisterForm() {
       });
 
       if (error) throw error;
-    } catch (err: any) {
-      setError(err.message || "Error al iniciar sesión con Google");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error al iniciar sesión con Google");
+    } finally {
       setIsOAuthLoading(false);
     }
   };
 
+  const goToLogin = () => {
+    setShowSuccessModal(false);
+    router.push("/login");
+  };
+
   return (
     <div className="min-h-screen bg-[#FFFEF7] flex items-center justify-center px-4 pt-32 pb-12">
+      <AnimatePresence>
+        {showSuccessModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm"
+            onClick={goToLogin}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="w-full max-w-md rounded-2xl border border-neutral-200/60 bg-[#FFFEF7] p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                  <Mail className="h-7 w-7 text-green-600" />
+                </div>
+                <h3
+                  className="text-xl font-bold text-neutral-900 mb-2"
+                  style={{
+                    fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                    fontWeight: 700,
+                  }}
+                >
+                  ¡Registro exitoso!
+                </h3>
+                <p
+                  className="text-neutral-600 text-sm leading-relaxed mb-6"
+                  style={{
+                    fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                  }}
+                >
+                  Por favor, revisa tu correo y haz clic en el enlace de confirmación para activar tu cuenta. Luego podrás iniciar sesión.
+                </p>
+                <Button
+                  type="button"
+                  onClick={goToLogin}
+                  className="w-full rounded-full bg-neutral-900 text-white font-semibold py-3 hover:bg-neutral-800"
+                  style={{
+                    fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                  }}
+                >
+                  Ir a iniciar sesión
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="w-full max-w-md">
         {!showAdditionalFields && (
           <motion.div
@@ -401,7 +435,7 @@ function RegisterForm() {
                       fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
                       fontWeight: 700,
                     }}>
-                      Tu primer análisis en segundos
+                      Análisis con IA en segundos
                     </h3>
                     <p className="text-sm text-neutral-600" style={{
                       fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
@@ -412,26 +446,26 @@ function RegisterForm() {
 
                   <div>
                     <label 
-                      htmlFor="companyName"
+                      htmlFor="websiteUrl"
                       className="block text-sm font-semibold text-neutral-900 mb-2 flex items-center gap-2"
                       style={{
                         fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
                       }}
                     >
                       <Building2 className="w-4 h-4" />
-                      Nombre de la empresa
+                      URL de la página web
                     </label>
                     <input
-                      id="companyName"
-                      type="text"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
+                      id="websiteUrl"
+                      type="url"
+                      value={websiteUrl}
+                      onChange={(e) => setWebsiteUrl(e.target.value)}
                       required
                       className="w-full px-4 py-3 rounded-xl border border-neutral-200/60 bg-white focus:outline-none transition-all"
                       style={{
                         fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
                       }}
-                      placeholder="Trii"
+                      placeholder="https://www.trii.co"
                     />
                   </div>
 
@@ -535,6 +569,60 @@ function RegisterForm() {
                       )}
                     </div>
                     {playStoreValid === true && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-xs text-green-600 mt-1"
+                      >
+                        ✓ URL válida
+                      </motion.p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="appStoreUrl"
+                      className="block text-sm font-semibold text-neutral-900 mb-2 flex items-center gap-2"
+                      style={{
+                        fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                      }}
+                    >
+                      <Smartphone className="w-4 h-4" />
+                      URL de App Store
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="appStoreUrl"
+                        type="url"
+                        value={appStoreUrl}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setAppStoreUrl(value);
+                          validateAppStore(value);
+                        }}
+                        className={`w-full px-4 py-3 rounded-xl border bg-white focus:outline-none transition-all ${
+                          appStoreValid === true
+                            ? 'border-green-300'
+                            : appStoreValid === false
+                            ? 'border-red-300'
+                            : 'border-neutral-200/60'
+                        }`}
+                        style={{
+                          fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                        }}
+                        placeholder="https://apps.apple.com/app/.../id..."
+                      />
+                      {appStoreValid === true && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                        >
+                          <Check className="w-5 h-5 text-green-500" />
+                        </motion.div>
+                      )}
+                    </div>
+                    {appStoreValid === true && (
                       <motion.p
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}

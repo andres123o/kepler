@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { PageLoader } from "@/components/shared/PageLoader";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,43 +30,6 @@ export default function LoginPage() {
       });
 
       if (error) throw error;
-
-      // Verificar si tiene organización, si no, crearla
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        setError("Error al obtener información del usuario");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (profile) {
-        const profileData = profile as { id: string; full_name?: string | null };
-        const { data: organization } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('owner_id', profileData.id)
-          .single()
-
-        if (!organization) {
-          // Crear organización por defecto
-          await supabase
-            .from('organizations')
-            .insert({
-              name: `${profileData.full_name || 'Usuario'}'s Organization`,
-              slug: `${profileData.id}-${Date.now()}`,
-              owner_id: profileData.id,
-              plan: 'hobby',
-              trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-              subscription_status: 'trial',
-            } as any)
-        }
-      }
 
       router.push("/dashboard");
       router.refresh();
@@ -109,6 +72,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#FFFEF7] flex items-center justify-center px-4 py-12">
+      <AnimatePresence>
+        {(isLoading || isOAuthLoading) && <PageLoader />}
+      </AnimatePresence>
       <div className="w-full max-w-md">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -205,25 +171,28 @@ export default function LoginPage() {
                 fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
               }}
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Iniciando sesión...
-                </>
-              ) : (
-                "Iniciar sesión"
-              )}
+              Iniciar sesión
             </Button>
           </form>
 
-          <p 
-            className="text-center text-sm text-neutral-600 mt-6"
+          <p
+            className="text-center text-[13px] text-neutral-500 mt-6"
             style={{
               fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
             }}
           >
-            ¿No tienes una cuenta?{" "}
-            <Link href="/register" className="text-neutral-900 font-semibold hover:underline">
+            <Link
+              href="/forgot-password"
+              className="text-neutral-500 hover:text-neutral-800 transition-colors duration-200"
+            >
+              ¿Olvidaste tu <span className="font-semibold">contraseña</span>?
+            </Link>
+            <span className="mx-2" aria-hidden>·</span>
+            <span className="text-neutral-500">¿No tienes una cuenta?</span>{" "}
+            <Link
+              href="/register"
+              className="text-neutral-500 hover:text-neutral-800 transition-colors duration-200 font-semibold"
+            >
               Regístrate
             </Link>
           </p>

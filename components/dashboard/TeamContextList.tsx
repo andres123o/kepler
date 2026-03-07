@@ -1,26 +1,25 @@
 "use client";
 
-import { Trash2, Edit2, User, Mail, Briefcase, Target, Sparkles } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { Trash2, Edit2, User, Briefcase, Target } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 
 interface TeamContext {
   id: string;
-  name: string;
-  email: string | null;
-  expertise: string;
-  responsible_for: string;
+  nombre: string;
+  rol: string | null;
+  foco: string | null;
   created_at: string;
 }
 
 interface TeamContextListProps {
   contexts: TeamContext[];
   onEdit?: (context: TeamContext) => void;
+  /** Conectar al backend: DELETE /api/team-context/:id (o equivalente) */
+  onDelete?: (id: string) => Promise<void>;
 }
 
-// Gradientes del arcoíris (mismos colores del proyecto)
 const gradients = [
   "from-[#4A0072]/15 via-[#8A2BE2]/15 to-[#C2185B]/15",
   "from-[#C2185B]/15 via-[#FF8C00]/15 to-[#FF4500]/15",
@@ -30,8 +29,6 @@ const gradients = [
   "from-[#C2185B]/15 via-[#8A2BE2]/15 to-[#4A0072]/15",
 ];
 
-
-// Función para obtener tiempo relativo
 function getRelativeTime(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
@@ -47,7 +44,6 @@ function getRelativeTime(dateString: string): string {
   return date.toLocaleDateString("es-ES", { year: "numeric", month: "short", day: "numeric" });
 }
 
-// Función para verificar si es nuevo (últimas 24 horas)
 function isNew(dateString: string): boolean {
   const date = new Date(dateString);
   const now = new Date();
@@ -55,33 +51,21 @@ function isNew(dateString: string): boolean {
   return diffHours < 24;
 }
 
-export function TeamContextList({ contexts, onEdit }: TeamContextListProps) {
+export function TeamContextList({ contexts, onEdit, onDelete }: TeamContextListProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const handleDelete = async (id: string, e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    
-    if (!confirm("¿Estás seguro de que quieres eliminar este miembro del equipo?")) {
-      return;
-    }
+    if (!confirm("¿Estás seguro de que quieres eliminar este miembro del equipo?")) return;
 
     setDeletingId(id);
     try {
-      const { error } = await supabase
-        .from("team_context")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
+      if (onDelete) await onDelete(id);
       router.refresh();
-      window.location.reload();
     } catch (err) {
       console.error("Error al eliminar:", err);
       alert("Error al eliminar el miembro");
@@ -90,19 +74,12 @@ export function TeamContextList({ contexts, onEdit }: TeamContextListProps) {
     }
   };
 
-  // Calcular estadísticas
-  const stats = useMemo(() => {
-    const total = contexts.length;
-    return { total };
-  }, [contexts]);
+  const stats = useMemo(() => ({ total: contexts.length }), [contexts]);
 
-  if (contexts.length === 0) {
-    return null;
-  }
+  if (contexts.length === 0) return null;
 
   return (
     <div className="space-y-6">
-      {/* Widget de Estadísticas */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -121,13 +98,12 @@ export function TeamContextList({ contexts, onEdit }: TeamContextListProps) {
         </div>
       </motion.div>
 
-      {/* Lista de Cards */}
       <div className="space-y-4">
         {contexts.map((context, index) => {
           const gradient = gradients[index % gradients.length];
-          const isHovered = hoveredId === context.id;
           const relativeTime = getRelativeTime(context.created_at);
           const isNewContext = isNew(context.created_at);
+          const nombre = context.nombre ?? (context as any).name ?? "";
 
           return (
             <motion.div
@@ -137,11 +113,9 @@ export function TeamContextList({ contexts, onEdit }: TeamContextListProps) {
               transition={{ delay: index * 0.1 }}
               className={`relative group rounded-2xl bg-gradient-to-br ${gradient} p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden`}
             >
-              {/* Efecto de brillo en hover */}
               <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/0 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
-              {/* Header: Badge "Nuevo" y botones de acción */}
-              <div className="absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-auto">
+              <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
                 {isNewContext && (
                   <span className="inline-flex items-center px-2.5 py-1 bg-gradient-to-r from-[#C2185B] to-[#FF8C00] text-white text-xs font-semibold rounded-full shadow-lg">
                     Nuevo
@@ -172,83 +146,41 @@ export function TeamContextList({ contexts, onEdit }: TeamContextListProps) {
                 </button>
               </div>
 
-              {/* Contenido principal */}
               <div className="relative z-10 pr-20">
-                {/* Sección principal: Icono y título */}
-                <div className="flex items-center gap-4 mb-5">
-                  {/* Icono destacado - más grande y centrado */}
+                <div className="flex items-center gap-4 mb-4">
                   <div className="flex-shrink-0 w-14 h-14 flex items-center justify-center rounded-2xl bg-white/70 backdrop-blur-sm shadow-md border border-white/50">
                     <User className="w-7 h-7 text-neutral-900" />
                   </div>
-
-                  {/* Título */}
                   <div className="flex-1 min-w-0">
-                    <h3 
-                      className="text-xl font-bold text-neutral-900 mb-1.5 leading-tight"
-                      style={{
-                        fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-                        fontWeight: 700,
-                      }}
-                    >
-                      {context.name}
+                    <h3 className="text-xl font-bold text-neutral-900 mb-1.5 leading-tight">
+                      {nombre}
                     </h3>
                   </div>
                 </div>
 
-                {/* Detalles */}
-                <div className="mb-4">
-                  {context.email && (
-                    <p 
-                      className="text-sm text-neutral-600 leading-relaxed mb-3"
-                      style={{
-                        fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-                      }}
-                    >
-                      {context.email}
-                    </p>
-                  )}
-                  <div className="space-y-3">
+                <div className="space-y-3">
+                  {context.rol && (
                     <div>
-                      <p className="text-xs font-semibold text-neutral-700 mb-1.5 flex items-center gap-1.5">
+                      <p className="text-xs font-semibold text-neutral-700 mb-1 flex items-center gap-1.5">
                         <Briefcase className="w-3.5 h-3.5" />
-                        Especialidad
+                        Rol
                       </p>
-                      <p
-                        className="text-sm text-neutral-600 leading-relaxed"
-                        style={{
-                          fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-                        }}
-                      >
-                        {context.expertise}
-                      </p>
+                      <p className="text-sm text-neutral-600 leading-relaxed">{context.rol}</p>
                     </div>
+                  )}
+                  {context.foco && (
                     <div>
-                      <p className="text-xs font-semibold text-neutral-700 mb-1.5 flex items-center gap-1.5">
+                      <p className="text-xs font-semibold text-neutral-700 mb-1 flex items-center gap-1.5">
                         <Target className="w-3.5 h-3.5" />
-                        Responsable de
+                        Foco
                       </p>
-                      <p
-                        className="text-sm text-neutral-600 leading-relaxed"
-                        style={{
-                          fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-                        }}
-                      >
-                        {context.responsible_for}
-                      </p>
+                      <p className="text-sm text-neutral-600 leading-relaxed">{context.foco}</p>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                {/* Footer: Metadatos */}
                 <div className="flex items-center gap-3 pt-4 border-t border-white/30">
-                  <span 
-                    className="text-xs text-neutral-500 font-medium"
-                    style={{
-                      fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
-                    }}
-                  >
-                    {relativeTime}
-                  </span>
+                  <span className="text-xs text-neutral-500 font-medium">{relativeTime}</span>
                 </div>
               </div>
             </motion.div>
@@ -258,4 +190,3 @@ export function TeamContextList({ contexts, onEdit }: TeamContextListProps) {
     </div>
   );
 }
-

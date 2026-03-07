@@ -1,7 +1,6 @@
 "use client";
 
 import { Trash2, Edit2, Target, Lightbulb, TrendingUp, BarChart3, Rocket, FileText, Sparkles } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
@@ -16,6 +15,8 @@ interface BusinessContext {
 interface BusinessContextListProps {
   contexts: BusinessContext[];
   onEdit?: (context: BusinessContext) => void;
+  /** Conectar al backend: DELETE /api/business-context/:id (o equivalente) */
+  onDelete?: (id: string) => Promise<void>;
 }
 
 // Gradientes inspirados en la landing (púrpura, rosa/magenta, naranja, violeta, azul oscuro)
@@ -126,9 +127,8 @@ function getContentSize(wordCount: number): { label: string; color: string } {
   return { label: "Largo", color: "text-purple-600 bg-purple-50" };
 }
 
-export function BusinessContextList({ contexts, onEdit }: BusinessContextListProps) {
+export function BusinessContextList({ contexts, onEdit, onDelete }: BusinessContextListProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
@@ -137,22 +137,12 @@ export function BusinessContextList({ contexts, onEdit }: BusinessContextListPro
       e.preventDefault();
       e.stopPropagation();
     }
-    
-    if (!confirm("¿Estás seguro de que quieres eliminar este contexto?")) {
-      return;
-    }
+    if (!confirm("¿Estás seguro de que quieres eliminar este contexto?")) return;
 
     setDeletingId(id);
     try {
-      const { error } = await supabase
-        .from("business_context")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
+      if (onDelete) await onDelete(id);
       router.refresh();
-      window.location.reload();
     } catch (err) {
       console.error("Error al eliminar:", err);
       alert("Error al eliminar el contexto");

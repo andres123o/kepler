@@ -2,32 +2,32 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { Plus, Loader2, Instagram, Linkedin, Smartphone, MessageSquare, Ticket, FileText } from "lucide-react";
-import { motion } from "framer-motion";
-import { useDashboard } from "./DashboardContext";
+import { Plus, Loader2, Instagram, Linkedin, Smartphone, MessageSquare, Ticket, FileText, Database, X, Globe } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface DataSourceFormProps {
   organizationId: string;
   onCancel?: () => void;
-  showFormOnly?: boolean; // Si es true, siempre muestra el formulario (para primera vez)
-  existingSource?: any; // Si se proporciona, el formulario está en modo edición
+  showFormOnly?: boolean;
+  existingSource?: any;
+  /** Conectar al backend: POST /api/data-sources (o equivalente) */
+  onSave?: (payload: Record<string, unknown>) => Promise<void>;
 }
 
-type SourceType = "social" | "app_store" | "nps" | "csat" | "tickets";
+type SourceType = "social" | "app_store" | "website" | "nps" | "tickets" | "internal_data";
 type SocialPlatform = "instagram" | "linkedin";
 type AppStoreType = "play_store" | "app_store";
 type TicketsMethod = "api" | "file";
+type InternalDataMethod = "api" | "file";
 type ApiProvider = "zendesk" | "hubspot" | "custom";
 
-export function DataSourceForm({ organizationId, onCancel, showFormOnly = false, existingSource }: DataSourceFormProps) {
+export function DataSourceForm({ organizationId, onCancel, showFormOnly = false, existingSource, onSave }: DataSourceFormProps) {
   const router = useRouter();
-  const supabase = createClient();
-  const { setActivePanel } = useDashboard();
   // Si hay onCancel o showFormOnly, el formulario debe estar abierto desde el inicio
   const [isOpen, setIsOpen] = useState(showFormOnly || !!onCancel || !!existingSource);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   
   // Estado del formulario - inicializar con datos existentes si hay
   const [sourceType, setSourceType] = useState<SourceType | "">(
@@ -42,9 +42,13 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
     // App Stores
     appStoreType: (existingSource?.app_store_type || "") as AppStoreType | "",
     appUrl: existingSource?.app_url || "",
-    
+    // Sitio Web
+    websiteUrl: existingSource?.website_url || "",
     // Tickets
     ticketsMethod: (existingSource?.tickets_method || "") as TicketsMethod | "",
+    // Internal Data
+    internalDataMethod: (existingSource?.internal_data_method || "") as InternalDataMethod | "",
+    // API (compartido entre tickets e internal_data)
     apiProvider: (existingSource?.api_provider || "") as ApiProvider | "",
     apiEndpoint: existingSource?.api_endpoint || "",
     apiKey: existingSource?.api_credentials_encrypted || "",
@@ -61,14 +65,16 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
         return !!(formData.socialPlatform && formData.socialUsername && formData.socialProfileUrl);
       case "app_store":
         return !!(formData.appStoreType && formData.appUrl);
+      case "website":
+        return !!formData.websiteUrl?.trim();
       case "nps":
-      case "csat":
         return true; // No requieren campos adicionales
       case "tickets":
-        if (formData.ticketsMethod === "api") {
-          return !!(formData.apiProvider && formData.apiEndpoint && formData.apiKey && formData.apiConfig);
-        }
+        // Solo validar método "file" (API bloqueada)
         return formData.ticketsMethod === "file";
+      case "internal_data":
+        // Solo validar método "file" (API bloqueada)
+        return formData.internalDataMethod === "file";
       default:
         return false;
     }
@@ -87,16 +93,7 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
     setIsLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        throw new Error("No estás autenticado");
-      }
-
-      // Construir el objeto de inserción según el tipo
-      let insertData: any = {
+      const insertData: Record<string, unknown> = {
         organization_id: organizationId,
         source_type: sourceType,
       };
@@ -119,99 +116,45 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
           insertData.app_url = formData.appUrl.trim();
           break;
 
+        case "website":
+          if (!formData.websiteUrl?.trim()) {
+            throw new Error("Debes proporcionar la URL del sitio web");
+          }
+          insertData.source_name = "Sitio Web";
+          insertData.website_url = formData.websiteUrl.trim();
+          break;
+
         case "nps":
           insertData.source_name = "NPS";
           insertData.import_method_reference = "Se subirá archivo cuando se genere el análisis";
           break;
 
-        case "csat":
-          insertData.source_name = "CSAT";
-          insertData.import_method_reference = "Se subirá archivo cuando se genere el análisis";
+        case "tickets":
+          // Solo permitir método "file" por ahora (API bloqueada)
+          if (formData.ticketsMethod === "api") {
+            throw new Error("La conexión con API estará disponible pronto. Por ahora, usa la opción de subir archivo.");
+          }
+          insertData.source_name = "Tickets (Archivo)";
+          insertData.tickets_method = "file";
+          insertData.import_method_reference = "Usuario importará data desde un archivo después";
           break;
 
-        case "tickets":
-          if (formData.ticketsMethod === "api") {
-            if (!formData.apiConfig || formData.apiConfig.trim() === "") {
-              throw new Error("La configuración adicional (JSON) es requerida");
-            }
-            insertData.source_name = formData.apiProvider === "zendesk" ? "Zendesk" : 
-                                     formData.apiProvider === "hubspot" ? "HubSpot" : 
-                                     "Custom API";
-            insertData.tickets_method = "api";
-            insertData.api_provider = formData.apiProvider;
-            insertData.api_endpoint = formData.apiEndpoint.trim();
-            // En producción, esto debería estar encriptado
-            insertData.api_credentials_encrypted = formData.apiKey || formData.apiToken || "";
-            try {
-              insertData.api_config = JSON.parse(formData.apiConfig);
-            } catch {
-              throw new Error("La configuración adicional debe ser un JSON válido");
-            }
-          } else {
-            insertData.source_name = "Tickets (Archivo)";
-            insertData.tickets_method = "file";
-            insertData.import_method_reference = "Usuario importará data desde un archivo después";
+        case "internal_data":
+          // Solo permitir método "file" por ahora (API bloqueada)
+          if (formData.internalDataMethod === "api") {
+            throw new Error("La conexión con API estará disponible pronto. Por ahora, usa la opción de subir archivo.");
           }
+          insertData.source_name = "Data Interna (Archivo)";
+          insertData.internal_data_method = "file";
+          insertData.import_method_reference = "Usuario importará data interna desde un archivo después";
           break;
       }
 
-      // Insertar o actualizar fuente de datos
       if (existingSource?.id) {
-        // Modo edición: actualizar
-        const { error: updateError } = await supabase
-          .from("data_sources")
-          // @ts-ignore - Supabase client types issue with generic table
-          .update(insertData)
-          .eq("id", existingSource.id);
-
-        if (updateError) {
-          throw updateError;
-        }
-      } else {
-        // Modo creación: insertar
-        const { error: insertError } = await supabase
-          .from("data_sources")
-          // @ts-ignore - Supabase client types issue with generic table
-          .insert(insertData);
-
-        if (insertError) {
-          throw insertError;
-        }
-
-        // Verificar si es la primera fuente de datos para marcar el paso 3 como completado
-        const { data: existingSources } = await supabase
-          .from("data_sources")
-          .select("id")
-          .eq("organization_id", organizationId);
-
-        if (existingSources && existingSources.length === 1) {
-          // Es la primera fuente, marcar paso 3 como completado
-          const { data: existingProgress } = await supabase
-            .from("onboarding_progress")
-            .select("id")
-            .eq("organization_id", organizationId)
-            .maybeSingle();
-
-          if (existingProgress) {
-            await supabase
-              .from("onboarding_progress")
-            // @ts-ignore - Supabase client types issue with generic table
-            .update({
-                step_3_completed: true,
-                step_3_completed_at: new Date().toISOString(),
-              })
-              .eq("organization_id", organizationId);
-          } else {
-            await supabase
-              .from("onboarding_progress")
-            // @ts-ignore - Supabase client types issue with generic table
-            .insert({
-                organization_id: organizationId,
-                step_3_completed: true,
-                step_3_completed_at: new Date().toISOString(),
-              });
-          }
-        }
+        (insertData as any).id = existingSource.id;
+      }
+      if (onSave) {
+        await onSave(insertData);
       }
 
       // Limpiar formulario y cerrar
@@ -222,7 +165,9 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
         socialProfileUrl: "",
         appStoreType: "",
         appUrl: "",
+        websiteUrl: "",
         ticketsMethod: "",
+        internalDataMethod: "",
         apiProvider: "",
         apiEndpoint: "",
         apiKey: "",
@@ -236,28 +181,8 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
         onCancel();
       }
       
-      // Refrescar página
-      if (!existingSource?.id) {
-        // Si es la primera fuente, cambiar al panel dashboard y refrescar
-        const { data: existingSources } = await supabase
-          .from("data_sources")
-          .select("id")
-          .eq("organization_id", organizationId);
-        
-        if (existingSources && existingSources.length === 1) {
-          setActivePanel('dashboard');
-          setTimeout(() => {
-            window.location.reload();
-          }, 100);
-        } else {
-          router.refresh();
-          window.location.reload();
-        }
-      } else {
-        // Modo edición: solo refrescar
-        router.refresh();
-        window.location.reload();
-      }
+      // Refrescar datos del servidor sin cambiar de panel ni recargar la página
+      router.refresh();
     } catch (err: any) {
       setError(err.message || "Error al guardar la fuente de datos");
     } finally {
@@ -297,11 +222,12 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
             </label>
             <div className="flex flex-wrap gap-2">
               {[
+                { value: "website", label: "Sitio Web", icon: Globe },
                 { value: "social", label: "Redes Sociales", icon: MessageSquare },
                 { value: "app_store", label: "App Stores", icon: Smartphone },
                 { value: "nps", label: "NPS", icon: FileText },
-                { value: "csat", label: "CSAT", icon: FileText },
                 { value: "tickets", label: "Tickets de Soporte", icon: Ticket },
+                { value: "internal_data", label: "Data Interna", icon: Database },
               ].map((option) => {
                 const Icon = option.icon;
                 return (
@@ -317,7 +243,9 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
                         socialProfileUrl: "",
                         appStoreType: "",
                         appUrl: "",
+                        websiteUrl: "",
                         ticketsMethod: "",
+                        internalDataMethod: "",
                         apiProvider: "",
                         apiEndpoint: "",
                         apiKey: "",
@@ -426,6 +354,42 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
           </motion.div>
         )}
 
+        {sourceType === "website" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="relative rounded-2xl bg-gradient-to-br from-[#0ea5e9]/10 via-[#06b6d4]/10 to-[#22c55e]/10 p-6 backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 rounded-xl bg-white/50 backdrop-blur-sm">
+                <Globe className="w-5 h-5 text-neutral-900" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-neutral-900 text-lg">Sitio Web</h3>
+                <p className="text-sm text-neutral-600">
+                  Añade la URL de tu sitio web para analizar su contenido
+                </p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-neutral-900 mb-2">
+                  URL del sitio web <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="url"
+                  value={formData.websiteUrl}
+                  onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                  placeholder="https://tuempresa.com"
+                  required
+                  className="w-full px-4 py-3.5 rounded-xl border border-neutral-200 bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {sourceType === "app_store" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -488,7 +452,7 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
           </motion.div>
         )}
 
-        {(sourceType === "nps" || sourceType === "csat") && (
+        {sourceType === "nps" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -501,7 +465,7 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
               </div>
               <div className="flex-1">
                 <h3 className="font-bold text-neutral-900 text-lg">
-                  {sourceType === "nps" ? "NPS" : "CSAT"}
+                  NPS
                 </h3>
                 <p className="text-sm text-neutral-600">
                   Solo guardamos la referencia. El archivo se subirá cuando generes el análisis.
@@ -542,20 +506,29 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { value: "api", label: "Conectar con API" },
-                    { value: "file", label: "Subir archivo" },
+                    { value: "api", label: "Conectar con API", disabled: true },
+                    { value: "file", label: "Subir archivo", disabled: false },
                   ].map((option) => (
                     <motion.button
                       key={option.value}
                       type="button"
-                      onClick={() => setFormData({ ...formData, ticketsMethod: option.value as TicketsMethod })}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        if (option.disabled) {
+                          setShowComingSoonModal(true);
+                        } else {
+                          setFormData({ ...formData, ticketsMethod: option.value as TicketsMethod });
+                        }
+                      }}
+                      whileHover={option.disabled ? {} : { scale: 1.05 }}
+                      whileTap={option.disabled ? {} : { scale: 0.95 }}
                       className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                         formData.ticketsMethod === option.value
                           ? "bg-black text-white shadow-sm"
+                          : option.disabled
+                          ? "bg-neutral-100 text-neutral-400 cursor-not-allowed opacity-60"
                           : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
                       }`}
+                      disabled={option.disabled}
                     >
                       {option.label}
                     </motion.button>
@@ -563,7 +536,74 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
                 </div>
               </div>
 
-              {formData.ticketsMethod === "api" && (
+              {formData.ticketsMethod === "file" && (
+                <div className="p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-neutral-200/50">
+                  <p className="text-sm text-neutral-700">
+                    <strong>Nota:</strong> Solo guardamos la referencia de que usarás este método. 
+                    El archivo se subirá cuando generes el análisis.
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {sourceType === "internal_data" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="relative rounded-2xl bg-gradient-to-br from-[#191970]/10 via-[#4A0072]/10 to-[#8A2BE2]/10 p-6 backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 rounded-xl bg-white/50 backdrop-blur-sm">
+                <Database className="w-5 h-5 text-neutral-900" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-neutral-900 text-lg">Data Interna</h3>
+                <p className="text-sm text-neutral-600">
+                  Conecta con tu API de Product Analytics o sube archivos de datos internos
+                </p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-neutral-900 mb-3">
+                  Método <span className="text-red-500">*</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "api", label: "Conectar con API", disabled: true },
+                    { value: "file", label: "Subir archivo", disabled: false },
+                  ].map((option) => (
+                    <motion.button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        if (option.disabled) {
+                          setShowComingSoonModal(true);
+                        } else {
+                          setFormData({ ...formData, internalDataMethod: option.value as InternalDataMethod });
+                        }
+                      }}
+                      whileHover={option.disabled ? {} : { scale: 1.05 }}
+                      whileTap={option.disabled ? {} : { scale: 0.95 }}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                        formData.internalDataMethod === option.value
+                          ? "bg-black text-white shadow-sm"
+                          : option.disabled
+                          ? "bg-neutral-100 text-neutral-400 cursor-not-allowed opacity-60"
+                          : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                      }`}
+                      disabled={option.disabled}
+                    >
+                      {option.label}
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+
+              {formData.internalDataMethod === "api" && (
                 <div className="space-y-4 pt-4 border-t border-neutral-200/50">
                   <div>
                     <label className="block text-sm font-semibold text-neutral-900 mb-3">
@@ -600,7 +640,7 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
                       type="url"
                       value={formData.apiEndpoint}
                       onChange={(e) => setFormData({ ...formData, apiEndpoint: e.target.value })}
-                      placeholder="https://empresa.zendesk.com/api/v2"
+                      placeholder="https://api.amplitude.com/v2/events"
                       required
                       className="w-full px-4 py-3.5 rounded-xl border border-neutral-200 bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition-all"
                     />
@@ -625,7 +665,7 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
                     <textarea
                       value={formData.apiConfig}
                       onChange={(e) => setFormData({ ...formData, apiConfig: e.target.value })}
-                      placeholder='{"filters": {"status": "open"}, "limit": 100}'
+                      placeholder='{"filters": {"event_type": "funnel"}, "date_range": "last_30_days"}'
                       rows={4}
                       required
                       className="w-full px-4 py-3.5 rounded-xl border border-neutral-200 bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition-all font-mono text-sm"
@@ -634,11 +674,12 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
                 </div>
               )}
 
-              {formData.ticketsMethod === "file" && (
+              {formData.internalDataMethod === "file" && (
                 <div className="p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-neutral-200/50">
                   <p className="text-sm text-neutral-700">
                     <strong>Nota:</strong> Solo guardamos la referencia de que usarás este método. 
-                    El archivo se subirá cuando generes el análisis.
+                    El archivo se subirá cuando generes el análisis. Puedes subir datos de funnels, 
+                    métricas, logs de errores, User Journey, etc.
                   </p>
                 </div>
               )}
@@ -685,7 +726,9 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
                   socialProfileUrl: "",
                   appStoreType: "",
                   appUrl: "",
+                  websiteUrl: "",
                   ticketsMethod: "",
+                  internalDataMethod: "",
                   apiProvider: "",
                   apiEndpoint: "",
                   apiKey: "",
@@ -707,6 +750,70 @@ export function DataSourceForm({ organizationId, onCancel, showFormOnly = false,
           )}
         </div>
       </form>
+
+      {/* Modal "Disponible pronto" */}
+      <AnimatePresence>
+        {showComingSoonModal && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowComingSoonModal(false)}
+              className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+            />
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            >
+              <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-neutral-200">
+                <button
+                  onClick={() => setShowComingSoonModal(false)}
+                  className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
+                >
+                  <X className="w-4 h-4 text-neutral-500" />
+                </button>
+                <div className="text-center">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-gradient-to-r from-[#8A2BE2]/10 to-[#C2185B]/10 flex items-center justify-center mb-4">
+                    <Database className="w-6 h-6 text-[#8A2BE2]" />
+                  </div>
+                  <h3 
+                    className="text-xl font-bold text-neutral-900 mb-2"
+                    style={{
+                      fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                    }}
+                  >
+                    Disponible pronto
+                  </h3>
+                  <p 
+                    className="text-sm text-neutral-600 mb-6"
+                    style={{
+                      fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                    }}
+                  >
+                    La conexión con API estará disponible próximamente. Por ahora, puedes subir tus datos mediante archivo.
+                  </p>
+                  <motion.button
+                    onClick={() => setShowComingSoonModal(false)}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full px-6 py-3 bg-black text-white rounded-xl font-semibold hover:bg-neutral-900 transition-colors"
+                    style={{
+                      fontFamily: 'var(--font-inter), "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                    }}
+                  >
+                    Entendido
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

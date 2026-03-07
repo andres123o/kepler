@@ -1,13 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardPanels } from "./DashboardPanels";
-import { OnboardingTimeline } from "./OnboardingTimeline";
 import { DashboardContent } from "./DashboardContent";
 import { useDashboard } from "./DashboardContext";
 
 interface DashboardClientProps {
+  profile?: any;
   organization: any;
-  onboardingProgress: any;
   businessContexts: any[];
   hasBusinessInfo: boolean;
   teamContexts?: any[];
@@ -17,70 +17,82 @@ interface DashboardClientProps {
   insights?: any[];
 }
 
-export function DashboardClient({ 
-  organization, 
-  onboardingProgress, 
+export function DashboardClient({
+  profile,
+  organization,
   businessContexts,
   hasBusinessInfo,
   teamContexts = [],
   dataSources = [],
   reportSettings,
   organizationMembers = [],
-  insights = []
+  insights = [],
 }: DashboardClientProps) {
-  const { activePanel, setActivePanel } = useDashboard();
+  const { activePanel } = useDashboard();
 
-  // Verificar si el onboarding está completo
-  const isOnboardingComplete = onboardingProgress?.step_1_completed 
-    && onboardingProgress?.step_2_completed 
-    && onboardingProgress?.step_3_completed 
-    && onboardingProgress?.step_4_completed;
-
-  // Si el onboarding NO está completo, mostrar timeline o panel según activePanel
-  if (!isOnboardingComplete) {
-    // Si el panel activo NO es "dashboard", mostrar el panel correspondiente
+  useEffect(() => {
     if (activePanel !== "dashboard") {
+      const timeoutId = setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: "instant" });
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [activePanel]);
+
+  const organizationId = organization?.id ?? '';
+
+  if (insights.length > 0) {
+    if (activePanel === "dashboard") {
       return (
-        <DashboardPanels 
-          activePanel={activePanel} 
-          organizationId={organization.id}
+        <DashboardContent
+          profile={profile}
+          organization={organization}
+          insights={insights}
+          dataSources={dataSources}
           businessContexts={businessContexts}
           teamContexts={teamContexts}
-          dataSources={dataSources}
-          reportSettings={reportSettings}
           organizationMembers={organizationMembers}
-          organization={organization}
         />
       );
     }
-    // Si está en dashboard, mostrar timeline
-    return <OnboardingTimeline progress={onboardingProgress} onStepClick={setActivePanel} />
+    return (
+      <DashboardPanels
+        activePanel={activePanel}
+        organizationId={organizationId}
+        businessContexts={businessContexts}
+        teamContexts={teamContexts}
+        dataSources={dataSources}
+        reportSettings={reportSettings}
+        organizationMembers={organizationMembers}
+        organization={organization}
+      />
+    );
   }
 
-  // Si el onboarding está completo, mostrar dashboard normal o panel según activePanel
   if (activePanel === "dashboard") {
     return (
-      <DashboardContent 
+      <DashboardContent
+        profile={profile}
         organization={organization}
         insights={insights}
         dataSources={dataSources}
         businessContexts={businessContexts}
+        teamContexts={teamContexts}
+        organizationMembers={organizationMembers}
       />
-    )
+    );
   }
 
-  // Mostrar panel seleccionado
   return (
-        <DashboardPanels 
-          activePanel={activePanel} 
-          organizationId={organization.id}
-          businessContexts={businessContexts}
-          teamContexts={teamContexts}
-          dataSources={dataSources}
-          reportSettings={reportSettings}
-          organizationMembers={organizationMembers}
-          organization={organization}
-        />
+    <DashboardPanels
+      activePanel={activePanel}
+      organizationId={organizationId}
+      businessContexts={businessContexts}
+      teamContexts={teamContexts}
+      dataSources={dataSources}
+      reportSettings={reportSettings}
+      organizationMembers={organizationMembers}
+      organization={organization}
+    />
   );
 }
-

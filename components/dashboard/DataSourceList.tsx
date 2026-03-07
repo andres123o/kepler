@@ -1,7 +1,6 @@
 "use client";
 
 import { Trash2, Edit2, Instagram, Linkedin, Smartphone, MessageSquare, FileText, Database, Globe } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -15,7 +14,9 @@ interface DataSource {
   social_profile_url?: string;
   app_store_type?: string;
   app_url?: string;
+  website_url?: string;
   tickets_method?: string;
+  internal_data_method?: string;
   api_provider?: string;
   api_endpoint?: string;
   import_method_reference?: string;
@@ -25,6 +26,8 @@ interface DataSource {
 interface DataSourceListProps {
   sources: DataSource[];
   onEdit?: (source: DataSource) => void;
+  /** Conectar al backend: DELETE /api/data-sources/:id (o equivalente) */
+  onDelete?: (id: string) => Promise<void>;
 }
 
 const gradients = [
@@ -46,6 +49,9 @@ const borderColors = [
 ];
 
 function getSourceIcon(source: DataSource): { icon: any; label: string } {
+  if (source.source_type === "website") {
+    return { icon: Globe, label: "Sitio Web" };
+  }
   if (source.source_type === "social") {
     if (source.social_platform === "instagram") {
       return { icon: Instagram, label: "Instagram" };
@@ -53,15 +59,19 @@ function getSourceIcon(source: DataSource): { icon: any; label: string } {
     return { icon: Linkedin, label: "LinkedIn" };
   }
   if (source.source_type === "app_store") {
-    return { icon: Smartphone, label: "App Store" };
+    const label = (source as any).app_store_type === "play_store" ? "Play Store" : "App Store";
+    return { icon: Smartphone, label };
   }
-  if (source.source_type === "nps" || source.source_type === "csat") {
+  if (source.source_type === "nps") {
     return { icon: FileText, label: source.source_name };
   }
   if (source.source_type === "tickets") {
     return { icon: MessageSquare, label: "Tickets" };
   }
-  return { icon: Database, label: "Fuente" };
+  if (source.source_type === "internal_data") {
+    return { icon: Database, label: source.source_name || "Data Interna" };
+  }
+  return { icon: Database, label: source.source_name || "Fuente" };
 }
 
 function getRelativeTime(date: string): string {
@@ -100,6 +110,9 @@ function getRelativeTime(date: string): string {
 }
 
 function getSourceDetails(source: DataSource): string {
+  if (source.source_type === "website") {
+    return source.website_url || (source as any).app_url || "Sin URL";
+  }
   if (source.source_type === "social") {
     if (source.social_username) {
       return source.social_username;
@@ -122,8 +135,17 @@ function getSourceDetails(source: DataSource): string {
     }
     return "Archivo (se subirá después)";
   }
-  if (source.source_type === "nps" || source.source_type === "csat") {
+  if (source.source_type === "nps") {
     // Si import_method_reference contiene "documento", mostrar "Documento manual"
+    if (source.import_method_reference && source.import_method_reference.toLowerCase().includes("documento")) {
+      return "Documento manual";
+    }
+    return "Archivo (se subirá después)";
+  }
+  if (source.source_type === "internal_data") {
+    if (source.internal_data_method === "api") {
+      return `${source.api_provider || "API"} - ${source.api_endpoint || "Sin endpoint"}`;
+    }
     if (source.import_method_reference && source.import_method_reference.toLowerCase().includes("documento")) {
       return "Documento manual";
     }
@@ -132,9 +154,8 @@ function getSourceDetails(source: DataSource): string {
   return "Sin detalles";
 }
 
-export function DataSourceList({ sources, onEdit }: DataSourceListProps) {
+export function DataSourceList({ sources, onEdit, onDelete }: DataSourceListProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDelete = async (id: string, e?: React.MouseEvent) => {
@@ -142,17 +163,13 @@ export function DataSourceList({ sources, onEdit }: DataSourceListProps) {
       e.preventDefault();
       e.stopPropagation();
     }
-    
-    if (!confirm("¿Estás seguro de que quieres eliminar esta fuente de datos?")) {
-      return;
-    }
+    if (id === "org-website") return;
+    if (!confirm("¿Estás seguro de que quieres eliminar esta fuente de datos?")) return;
 
     setDeletingId(id);
     try {
-      const { error } = await supabase.from("data_sources").delete().eq("id", id);
-      if (error) throw error;
+      if (onDelete) await onDelete(id);
       router.refresh();
-      window.location.reload();
     } catch (error: any) {
       console.error("Error al eliminar:", error);
       alert("Error al eliminar la fuente de datos");
@@ -187,9 +204,9 @@ export function DataSourceList({ sources, onEdit }: DataSourceListProps) {
             {/* Efecto de brillo en hover */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/0 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
-            {/* Header: Botones de acción */}
+            {/* Header: Botones de acción (ocultar para Sitio Web de registro) */}
             <div className="absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-auto">
-              {onEdit && (
+              {onEdit && source.id !== "org-website" && (
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -203,15 +220,17 @@ export function DataSourceList({ sources, onEdit }: DataSourceListProps) {
                   <Edit2 className="w-4 h-4" />
                 </button>
               )}
-              <button
-                onClick={(e) => handleDelete(source.id, e)}
-                disabled={deletingId === source.id}
-                className="p-2 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50/80 transition-colors disabled:opacity-50 z-20 relative"
-                title="Eliminar"
-                type="button"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {source.id !== "org-website" && (
+                <button
+                  onClick={(e) => handleDelete(source.id, e)}
+                  disabled={deletingId === source.id}
+                  className="p-2 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50/80 transition-colors disabled:opacity-50 z-20 relative"
+                  title="Eliminar"
+                  type="button"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {/* Contenido principal */}
